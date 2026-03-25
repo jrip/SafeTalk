@@ -8,6 +8,7 @@ class CreateUserInput:
     email: str
     password_hash: str
     name: str
+    role: str = "user"
 
 
 @dataclass(frozen=True)
@@ -31,3 +32,4 @@ class UserView:
     id: UUID
     email: str
     name: str
+    role: str = "user"

@@ -11,5 +11,6 @@ class User:
     email: str
     password_hash: str
     name: str
+    role: str = "user"
     allow_negative_balance: bool = False
     id: UUID = field(default_factory=uuid4)
