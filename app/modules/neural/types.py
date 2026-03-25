@@ -28,3 +28,26 @@ class PredictionView:
     score: Decimal
     is_toxic: bool
     status: TaskStatus
+
+
+@dataclass(frozen=True)
+class CreateBatchTaskInput:
+    user_id: UUID
+    model_id: UUID
+    dialogs: list[str]
+
+
+@dataclass(frozen=True)
+class BatchTaskView:
+    batch_task_id: UUID
+    user_id: UUID
+    model_id: UUID
+    status: TaskStatus
+    total_dialogs: int
+
+
+@dataclass(frozen=True)
+class BatchTaskResultView:
+    batch_task_id: UUID
+    status: TaskStatus
+    results: list[PredictionView]
