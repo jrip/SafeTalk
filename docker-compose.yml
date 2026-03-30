@@ -27,7 +27,7 @@ services:
       - "5672:5672"
       - "15672:15672"
     volumes:
-      - ./data/rabbitmq:/var/lib/rabbitmq
+      - rabbitmq_data:/var/lib/rabbitmq
     restart: on-failure
 
   database:
@@ -41,3 +41,4 @@ services:
 
 volumes:
   postgres_data:
+  rabbitmq_data:
