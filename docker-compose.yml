@@ -28,7 +28,7 @@ services:
       - "15672:15672"
     volumes:
       - ./data/rabbitmq:/var/lib/rabbitmq
-    restart: unless-stopped
+    restart: on-failure
 
   database:
     image: postgres:16-alpine
@@ -37,4 +37,7 @@ services:
       POSTGRES_PASSWORD: safetalk
       POSTGRES_DB: safetalk
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
