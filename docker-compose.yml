@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    env_file:
+      - app/.env
+    volumes:
+      - ./app:/workspace/app
+    depends_on:
+      - database
+      - rabbitmq
+
+  web-proxy:
+    build: ./web-proxy
+    ports:
+      - "${WEB_PROXY_HTTP_PORT:-80}:80"
+      - "${WEB_PROXY_HTTPS_PORT:-443}:443"
+    depends_on:
+      - app
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    restart: on-failure
+
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: safetalk
+      POSTGRES_PASSWORD: safetalk
+      POSTGRES_DB: safetalk
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
