@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
@@ -9,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.bootstrap import AppContainer, build_app_container
+from app.core.settings import validate_settings
 from app.db.base import Base
 from app.db.session import engine, get_db
 import app.db.registry  # noqa: F401 — регистрация таблиц в metadata
@@ -32,6 +32,7 @@ def _init_db_schema_and_seed() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    validate_settings()
     await asyncio.to_thread(_init_db_schema_and_seed)
     yield
 
@@ -45,7 +46,6 @@ def get_app_container(session: Session = Depends(get_db)) -> AppContainer:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    _ = os.environ.get("DATABASE_URL", "")
     return {"status": "ok"}
 
 

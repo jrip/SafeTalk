@@ -2,11 +2,12 @@ from __future__ import annotations
 
 """Подключение к БД и фабрика sqlalchemy.orm.Session (не путать с auth_sessions / логином)."""
 
-import os
 from collections.abc import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+
+from app.core.settings import get_settings
 
 
 def _normalize_database_url(url: str) -> str:
@@ -16,10 +17,7 @@ def _normalize_database_url(url: str) -> str:
 
 
 def get_database_url() -> str:
-    url = os.environ.get("DATABASE_URL", "").strip()
-    if not url:
-        return "sqlite:///./app.db"
-    return _normalize_database_url(url)
+    return _normalize_database_url(get_settings().database_url)
 
 
 _engine = None
@@ -28,8 +26,9 @@ _engine = None
 def get_engine():
     global _engine
     if _engine is None:
+        settings = get_settings()
         url = get_database_url()
-        echo = os.environ.get("SQL_ECHO", "").lower() in ("1", "true", "yes")
+        echo = settings.sql_echo
         if url.startswith("sqlite"):
             _engine = create_engine(url, echo=echo, connect_args={"check_same_thread": False})
         else:

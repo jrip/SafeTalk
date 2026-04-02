@@ -10,8 +10,10 @@ services:
     volumes:
       - ./app:/workspace/app
     depends_on:
-      - database
-      - rabbitmq
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
 
   web-proxy:
     build: ./web-proxy
@@ -36,8 +38,16 @@ services:
       POSTGRES_USER: safetalk
       POSTGRES_PASSWORD: safetalk
       POSTGRES_DB: safetalk
+    ports:
+      - "${POSTGRES_PUBLISH_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U safetalk -d safetalk"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
 volumes:
   postgres_data:
