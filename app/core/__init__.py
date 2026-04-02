@@ -1,7 +1,7 @@
 """Core shared primitives for the SafeTalk domain."""
 
 from .exceptions import DomainError, InsufficientBalanceError, NotFoundError, ValidationError
-from .settings import Settings, get_settings, validate_settings
+from .settings import AppSettings, Settings, get_settings, validate_settings
 from .types import ID, UTCDateTime, now_utc
 
 __all__ = [
@@ -12,6 +12,7 @@ __all__ = [
     "ID",
     "UTCDateTime",
     "now_utc",
+    "AppSettings",
     "Settings",
     "get_settings",
     "validate_settings",
