@@ -1,19 +1,41 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from uuid import UUID
 
+from sqlalchemy.orm import Session
+
 from app.modules.history.interfaces import HistoryInternalService
+from app.modules.history.ports import HistoryStore
 from app.modules.history.types import HistoryView
 
 
 class HistoryService(HistoryInternalService):
-    def __init__(self) -> None:
-        """Сервис History без реализации хранения (на этапе проектирования)."""
+    def __init__(self, history: HistoryStore, session: Session) -> None:
+        self._history = history
+        self._session = session
 
     def get_api_history(self, user_id: UUID) -> list[HistoryView]:
-        """Внешний метод: получить историю API-запросов пользователя."""
-        raise NotImplementedError("History retrieval is mocked at this stage")
+        return self._history.list_for_user(user_id)
 
-    def save_api_request(self, user_id: UUID, request: str, result: str) -> None:
-        """Внутренний публичный метод: сохранить запрос к API."""
-        raise NotImplementedError("History persistence is mocked at this stage")
+    def save_api_request(
+        self,
+        user_id: UUID,
+        request: str,
+        result: str,
+        *,
+        ml_model_id: UUID | None = None,
+        ml_task_id: UUID | None = None,
+        tokens_charged: Decimal | None = None,
+        commit: bool = True,
+    ) -> None:
+        self._history.append(
+            user_id,
+            request,
+            result,
+            ml_model_id=ml_model_id,
+            ml_task_id=ml_task_id,
+            tokens_charged=tokens_charged,
+        )
+        if commit:
+            self._session.commit()

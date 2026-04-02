@@ -33,3 +33,4 @@ class UserView:
     email: str
     name: str
     role: str = "user"
+    allow_negative_balance: bool = False
