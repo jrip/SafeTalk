@@ -50,6 +50,7 @@ _DEMO_LEDGER_DEBIT_ID = UUID("20000000-0000-4000-8000-000000000003")
 _DEMO_LEDGER_CREDIT_USER_ID = UUID("20000000-0000-4000-8000-000000000004")
 _DEMO_LEDGER_CREDIT_ADMIN_ID = UUID("20000000-0000-4000-8000-000000000005")
 _DEMO_FEEDBACK_ID = UUID("20000000-0000-4000-8000-000000000006")
+_DEMO_LEDGER_DEBIT_ADMIN_ID = UUID("20000000-0000-4000-8000-000000000007")
 
 
 def _seed_ml_models(session: Session) -> None:
@@ -174,9 +175,37 @@ def _seed_demo_user_rich_data(session: Session) -> None:
     session.flush()
 
 
+def _seed_demo_admin_debit(session: Session) -> None:
+    """Ручное списание в демо-данных (админ): пополнение уже в _seed_demo_users."""
+    if session.get(BalanceLedgerEntryModel, _DEMO_LEDGER_DEBIT_ADMIN_ID) is not None:
+        return
+    if session.get(UserModel, _DEMO_ADMIN_ID) is None:
+        return
+    bal = session.get(UserBalanceModel, _DEMO_ADMIN_ID)
+    if bal is None:
+        return
+    amount = Decimal("100")
+    if bal.token_count < amount:
+        return
+    ts = now_utc()
+    session.add(
+        BalanceLedgerEntryModel(
+            id=_DEMO_LEDGER_DEBIT_ADMIN_ID,
+            user_id=_DEMO_ADMIN_ID,
+            kind="debit",
+            amount=amount,
+            task_id=None,
+        )
+    )
+    bal.token_count = bal.token_count - amount
+    bal.updated_at = ts
+    session.flush()
+
+
 def run_seed(session: Session) -> None:
     """Идемпотентно: ML-модели, демо-пользователь и админ, балансы, журнал, пример задачи/истории/фидбека."""
     _seed_ml_models(session)
     _seed_demo_users(session)
+    _seed_demo_admin_debit(session)
     _seed_demo_user_rich_data(session)
     session.flush()
