@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import uuid
 from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.modules.neural.models import MlModelModel
+from app.core.types import now_utc
+from app.modules.billing.models import BalanceLedgerEntryModel, UserBalanceModel
+from app.modules.feedback.models import FeedbackModel
+from app.modules.history.models import HistoryRecordModel
+from app.modules.neural.models import MlModelModel, MlPredictionTaskModel
+from app.modules.users.models import UserModel
 
 _ML_MODEL_SPECS: tuple[dict, ...] = (
     {
@@ -31,12 +37,146 @@ _ML_MODEL_SPECS: tuple[dict, ...] = (
     },
 )
 
+_DEFAULT_ML_MODEL_ID = UUID("00000000-0000-4000-8000-000000000001")
 
-def run_seed(session: Session) -> None:
-    """Идемпотентно добавляет базовые ML-модели по уникальному slug."""
+_DEMO_USER_ID = UUID("10000000-0000-4000-8000-000000000001")
+_DEMO_ADMIN_ID = UUID("10000000-0000-4000-8000-000000000002")
+_DEMO_USER_EMAIL = "demo@safetalk.local"
+_DEMO_ADMIN_EMAIL = "admin@safetalk.local"
+
+_DEMO_TASK_ID = UUID("20000000-0000-4000-8000-000000000001")
+_DEMO_HISTORY_ID = UUID("20000000-0000-4000-8000-000000000002")
+_DEMO_LEDGER_DEBIT_ID = UUID("20000000-0000-4000-8000-000000000003")
+_DEMO_LEDGER_CREDIT_USER_ID = UUID("20000000-0000-4000-8000-000000000004")
+_DEMO_LEDGER_CREDIT_ADMIN_ID = UUID("20000000-0000-4000-8000-000000000005")
+_DEMO_FEEDBACK_ID = UUID("20000000-0000-4000-8000-000000000006")
+
+
+def _seed_ml_models(session: Session) -> None:
     for spec in _ML_MODEL_SPECS:
         slug = spec["slug"]
         if session.scalar(select(MlModelModel.id).where(MlModelModel.slug == slug)):
             continue
         session.add(MlModelModel(**spec))
+    session.flush()
+
+
+def _seed_demo_users(session: Session) -> None:
+    demos: tuple[dict, ...] = (
+        {
+            "id": _DEMO_USER_ID,
+            "email": _DEMO_USER_EMAIL,
+            "name": "Demo User",
+            "role": "user",
+            "credit_id": _DEMO_LEDGER_CREDIT_USER_ID,
+            "topup": Decimal("1000"),
+        },
+        {
+            "id": _DEMO_ADMIN_ID,
+            "email": _DEMO_ADMIN_EMAIL,
+            "name": "Demo Admin",
+            "role": "admin",
+            "credit_id": _DEMO_LEDGER_CREDIT_ADMIN_ID,
+            "topup": Decimal("10000"),
+        },
+    )
+    for d in demos:
+        if session.scalar(select(UserModel.id).where(UserModel.email == d["email"])):
+            continue
+        session.add(
+            UserModel(
+                id=d["id"],
+                email=d["email"],
+                password_hash="seed-not-for-production",
+                name=d["name"],
+                role=d["role"],
+            )
+        )
+        ts = now_utc()
+        session.add(
+            UserBalanceModel(
+                user_id=d["id"],
+                token_count=d["topup"],
+                updated_at=ts,
+            )
+        )
+        session.add(
+            BalanceLedgerEntryModel(
+                id=d["credit_id"],
+                user_id=d["id"],
+                kind="credit",
+                amount=d["topup"],
+                task_id=None,
+            )
+        )
+    session.flush()
+
+
+def _seed_demo_user_rich_data(session: Session) -> None:
+    if session.get(MlPredictionTaskModel, _DEMO_TASK_ID) is not None:
+        return
+    if session.get(UserModel, _DEMO_USER_ID) is None:
+        return
+
+    demo_text = "Sample demo text for SafeTalk."
+    price = Decimal("0.01")
+    charge = Decimal(len(demo_text)) * price
+
+    bal = session.get(UserBalanceModel, _DEMO_USER_ID)
+    if bal is None:
+        return
+    if bal.token_count < charge:
+        return
+
+    ts = now_utc()
+    session.add(
+        MlPredictionTaskModel(
+            id=_DEMO_TASK_ID,
+            user_id=_DEMO_USER_ID,
+            model_id=_DEFAULT_ML_MODEL_ID,
+            text=demo_text,
+            status="pending",
+            charged_tokens=charge,
+        )
+    )
+    session.add(
+        HistoryRecordModel(
+            id=_DEMO_HISTORY_ID,
+            user_id=_DEMO_USER_ID,
+            ml_model_id=_DEFAULT_ML_MODEL_ID,
+            ml_task_id=_DEMO_TASK_ID,
+            request=demo_text,
+            result="PENDING",
+            tokens_charged=charge,
+        )
+    )
+    session.add(
+        BalanceLedgerEntryModel(
+            id=_DEMO_LEDGER_DEBIT_ID,
+            user_id=_DEMO_USER_ID,
+            kind="debit",
+            amount=charge,
+            task_id=_DEMO_TASK_ID,
+        )
+    )
+    bal.token_count = bal.token_count - charge
+    bal.updated_at = ts
+
+    session.add(
+        FeedbackModel(
+            id=_DEMO_FEEDBACK_ID,
+            history_id=_DEMO_HISTORY_ID,
+            user_id=_DEMO_USER_ID,
+            is_toxic=False,
+            comment="seed demo feedback",
+        )
+    )
+    session.flush()
+
+
+def run_seed(session: Session) -> None:
+    """Идемпотентно: ML-модели, демо-пользователь и админ, балансы, журнал, пример задачи/истории/фидбека."""
+    _seed_ml_models(session)
+    _seed_demo_users(session)
+    _seed_demo_user_rich_data(session)
     session.flush()
