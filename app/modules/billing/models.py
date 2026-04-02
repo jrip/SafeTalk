@@ -8,7 +8,7 @@ from uuid import UUID
 from sqlalchemy import DateTime, ForeignKey, Numeric, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base
+from app.db.config import Base
 
 if TYPE_CHECKING:
     from app.modules.users.models import UserModel

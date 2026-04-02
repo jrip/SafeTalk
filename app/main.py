@@ -9,15 +9,13 @@ from sqlalchemy.orm import Session
 
 from app.bootstrap import AppContainer, build_app_container
 from app.core.settings import validate_settings
-from app.db.base import Base
-from app.db.session import engine, get_db
-import app.db.registry  # noqa: F401 — регистрация таблиц в metadata
+from app.db.config import Base  # подгружает модели в Base.metadata
+from app.db.database import SessionLocal, engine, get_db
+from app.db.seed import run_seed
 
 
 def _init_db_schema_and_seed() -> None:
     Base.metadata.create_all(bind=engine)
-    from app.db.seed import run_seed
-    from app.db.session import SessionLocal
 
     session = SessionLocal()
     try:
