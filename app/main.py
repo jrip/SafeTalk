@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
+from decimal import Decimal
+from uuid import UUID
 
 from fastapi import Depends, FastAPI
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.bootstrap import AppContainer, build_app_container
@@ -12,6 +15,13 @@ from app.core.settings import validate_settings
 from app.db.config import Base  # подгружает модели в Base.metadata
 from app.db.database import SessionLocal, engine, get_db
 from app.db.seed import run_seed
+from app.modules.neural.models import MlPredictionTaskModel
+from app.modules.neural.types import RunPredictionInput
+from app.modules.users.types import CreateUserInput
+
+log = logging.getLogger(__name__)
+
+_ML_MODEL_ID = UUID("00000000-0000-4000-8000-000000000001")
 
 
 def _init_db_schema_and_seed() -> None:
@@ -28,10 +38,54 @@ def _init_db_schema_and_seed() -> None:
         session.close()
 
 
+def _startup_playbook() -> None:
+    session = SessionLocal()
+    try:
+        c = build_app_container(session)
+
+        u1 = c.users.register(CreateUserInput(email="startup-a@local", password_hash="x", name="Startup A"))
+        log.info("startup user1 %s", u1)
+        u2 = c.users.register(CreateUserInput(email="startup-b@local", password_hash="x", name="Startup B"))
+        log.info("startup user2 %s", u2)
+
+        log.info("startup topup1 %s", c.billing.add_tokens(u1.id, Decimal("500")))
+        log.info("startup topup2 %s", c.billing.add_tokens(u2.id, Decimal("500")))
+
+        log.info(
+            "startup ml1 %s",
+            c.neural.create_prediction_task(
+                RunPredictionInput(user_id=u1.id, model_id=_ML_MODEL_ID, text="hello toxicity check"),
+            ),
+        )
+        log.info(
+            "startup ml2 %s",
+            c.neural.create_prediction_task(
+                RunPredictionInput(user_id=u2.id, model_id=_ML_MODEL_ID, text="another ml run"),
+            ),
+        )
+
+        log.info("startup history1 %r", c.history.get_user_history(u1.id))
+        log.info("startup history2 %r", c.history.get_user_history(u2.id))
+        log.info(
+            "startup tasks1 %r",
+            session.scalars(select(MlPredictionTaskModel).where(MlPredictionTaskModel.user_id == u1.id)).all(),
+        )
+        log.info(
+            "startup tasks2 %r",
+            session.scalars(select(MlPredictionTaskModel).where(MlPredictionTaskModel.user_id == u2.id)).all(),
+        )
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_settings()
     await asyncio.to_thread(_init_db_schema_and_seed)
+    await asyncio.to_thread(_startup_playbook)
     yield
 
 
