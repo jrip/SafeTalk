@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.modules.billing.entities import BalanceState, CreditTransaction, DebitTransaction, Transaction
 from app.modules.billing.interfaces import BillingInternalService
 from app.modules.billing.ports import BalanceStore
-from app.modules.billing.types import BalanceView
+from app.modules.billing.types import BalanceLedgerEntryView, BalanceView
 from app.modules.users.interfaces import UsersPublicService
 
 
@@ -33,6 +33,10 @@ class BillingService(BillingInternalService):
     def get_count_tokens(self, user_id: UUID) -> BalanceView:
         state = self._balance_state(user_id)
         return BalanceView(user_id=state.user_id, token_count=state.token_count)
+
+    def get_ledger_history(self, user_id: UUID) -> list[BalanceLedgerEntryView]:
+        self._users.get_profile(user_id)
+        return self._balance.list_ledger_for_user(user_id)
 
     def load_balance_state_for_update(self, user_id: UUID) -> BalanceState:
         profile = self._users.get_profile(user_id)

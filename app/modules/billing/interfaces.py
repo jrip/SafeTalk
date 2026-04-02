@@ -5,12 +5,15 @@ from typing import Protocol
 from uuid import UUID
 
 from app.modules.billing.entities import BalanceState
-from app.modules.billing.types import BalanceView
+from app.modules.billing.types import BalanceLedgerEntryView, BalanceView
 
 
 class BillingPublicService(Protocol):
     def get_count_tokens(self, user_id: UUID) -> BalanceView:
         """Внешний метод: получить количество доступных токенов."""
+
+    def get_ledger_history(self, user_id: UUID) -> list[BalanceLedgerEntryView]:
+        """Публичное чтение журнала операций по балансу (кредиты и списания)."""
 
     def add_tokens(
         self,

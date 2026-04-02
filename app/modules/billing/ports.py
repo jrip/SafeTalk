@@ -6,6 +6,7 @@ from typing import Protocol
 from uuid import UUID
 
 from app.modules.billing.entities import BalanceState, Transaction
+from app.modules.billing.types import BalanceLedgerEntryView
 
 
 class BalanceStore(Protocol):
@@ -20,3 +21,6 @@ class BalanceStore(Protocol):
 
     def persist_after_transaction(self, state: BalanceState, tx: Transaction) -> None:
         """Сохранить новый баланс и записать операцию в журнал."""
+
+    def list_ledger_for_user(self, user_id: UUID) -> list[BalanceLedgerEntryView]:
+        """Все записи журнала пользователя, новые операции первыми."""

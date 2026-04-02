@@ -1,8 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
+
+
+@dataclass(frozen=True)
+class BalanceLedgerEntryView:
+    """Одна запись журнала операций по балансу (credit / debit)."""
+
+    id: UUID
+    user_id: UUID
+    kind: str
+    amount: Decimal
+    task_id: UUID | None
+    created_at: datetime
 
 
 @dataclass(frozen=True)

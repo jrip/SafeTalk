@@ -77,6 +77,9 @@ def _startup_playbook() -> None:
         log.info("startup balance u1 после ML %s", c.billing.get_available_tokens(u1.id))
         log.info("startup balance u2 после ML %s", c.billing.get_available_tokens(u2.id))
 
+        log.info("startup журнал транзакций u1 %r", c.billing.get_ledger_history(u1.id))
+        log.info("startup журнал транзакций u2 %r", c.billing.get_ledger_history(u2.id))
+
         log.info("startup history1 %r", c.history.get_user_history(u1.id))
         log.info("startup history2 %r", c.history.get_user_history(u2.id))
         log.info(
