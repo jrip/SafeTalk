@@ -65,17 +65,19 @@ def _init_db_schema_and_seed() -> None:
 def _startup_playbook() -> None:
     session = SessionLocal()
     try:
-        c = build_app_container(session)
+        c: AppContainer = build_app_container(session)
 
         u1: UserView | None = None
         u2: UserView | None = None
         try:
             u1 = c.users.register(CreateUserInput(email="startup-a@local", password_hash="x", name="Startup A"))
         except Exception:
+            log.exception("startup register failed for startup-a@local; trying db lookup fallback")
             u1 = _user_view_from_db(session, "startup-a@local")
         try:
             u2 = c.users.register(CreateUserInput(email="startup-b@local", password_hash="x", name="Startup B"))
         except Exception:
+            log.exception("startup register failed for startup-b@local; trying db lookup fallback")
             u2 = _user_view_from_db(session, "startup-b@local")
 
         try:
@@ -83,18 +85,18 @@ def _startup_playbook() -> None:
                 log.info("startup user1 %s", u1)
                 log.info("startup user2 %s", u2)
 
-                log.info("startup balance u1 (начало) %s", c.billing.get_available_tokens(u1.id))
-                log.info("startup balance u2 (начало) %s", c.billing.get_available_tokens(u2.id))
+                log.info("startup balance u1 (начало) %s", c.billing.get_count_tokens(u1.id))
+                log.info("startup balance u2 (начало) %s", c.billing.get_count_tokens(u2.id))
 
                 log.info("startup пополнение u1 %s", c.billing.add_tokens(u1.id, Decimal("500")))
                 log.info("startup пополнение u2 %s", c.billing.add_tokens(u2.id, Decimal("500")))
 
-                log.info("startup balance u1 после пополнения %s", c.billing.get_available_tokens(u1.id))
-                log.info("startup balance u2 после пополнения %s", c.billing.get_available_tokens(u2.id))
+                log.info("startup balance u1 после пополнения %s", c.billing.get_count_tokens(u1.id))
+                log.info("startup balance u2 после пополнения %s", c.billing.get_count_tokens(u2.id))
 
                 log.info("startup списание u1 %s", c.billing.spend_tokens(u1.id, Decimal("42")))
 
-                log.info("startup balance u1 после списания %s", c.billing.get_available_tokens(u1.id))
+                log.info("startup balance u1 после списания %s", c.billing.get_count_tokens(u1.id))
 
                 log.info(
                     "startup ml1 %s",
@@ -109,14 +111,14 @@ def _startup_playbook() -> None:
                     ),
                 )
 
-                log.info("startup balance u1 после ML %s", c.billing.get_available_tokens(u1.id))
-                log.info("startup balance u2 после ML %s", c.billing.get_available_tokens(u2.id))
+                log.info("startup balance u1 после ML %s", c.billing.get_count_tokens(u1.id))
+                log.info("startup balance u2 после ML %s", c.billing.get_count_tokens(u2.id))
 
                 log.info("startup журнал транзакций u1 %r", c.billing.get_ledger_history(u1.id))
                 log.info("startup журнал транзакций u2 %r", c.billing.get_ledger_history(u2.id))
 
-                log.info("startup history1 %r", c.history.get_user_history(u1.id))
-                log.info("startup history2 %r", c.history.get_user_history(u2.id))
+                log.info("startup history1 %r", c.history.get_api_history(u1.id))
+                log.info("startup history2 %r", c.history.get_api_history(u2.id))
                 tasks1 = session.scalars(
                     select(MlPredictionTaskModel).where(MlPredictionTaskModel.user_id == u1.id)
                 ).all()
@@ -125,7 +127,10 @@ def _startup_playbook() -> None:
                 ).all()
                 log.info("startup tasks1 (%d)\n%s", len(tasks1), "\n".join(f"  {t}" for t in tasks1))
                 log.info("startup tasks2 (%d)\n%s", len(tasks2), "\n".join(f"  {t}" for t in tasks2))
+            else:
+                log.warning("startup playbook skipped: users unresolved (u1=%r, u2=%r)", u1, u2)
         except Exception:
+            log.exception("startup playbook failed")
             session.rollback()
     finally:
         session.close()

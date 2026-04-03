@@ -25,11 +25,6 @@ class BillingPublicService(Protocol):
     ) -> BalanceView:
         """Пополнить баланс токенов."""
 
-
-class BillingInternalService(BillingPublicService, Protocol):
-    def load_balance_state_for_update(self, user_id: UUID) -> BalanceState:
-        """Баланс и флаг allow_negative под блокировкой строки кошелька."""
-
     def spend_tokens(
         self,
         user_id: UUID,
@@ -39,4 +34,9 @@ class BillingInternalService(BillingPublicService, Protocol):
         commit: bool = True,
         locked_state: BalanceState | None = None,
     ) -> BalanceView:
-        """Списать токены. При locked_state повторный SELECT не выполняется (уже под FOR UPDATE)."""
+        """Списать токены с проверкой доступного баланса."""
+
+
+class BillingInternalService(BillingPublicService, Protocol):
+    def load_balance_state_for_update(self, user_id: UUID) -> BalanceState:
+        """Баланс и флаг allow_negative под блокировкой строки кошелька."""
