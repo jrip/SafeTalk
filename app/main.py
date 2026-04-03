@@ -19,6 +19,17 @@ from app.modules.neural.models import MlPredictionTaskModel
 from app.modules.neural.types import RunPredictionInput
 from app.modules.users.types import CreateUserInput
 
+
+def _configure_logging() -> None:
+    """Чтобы `log.info` из приложения был виден в консоли при `python -m uvicorn`."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)s [%(name)s] %(message)s",
+        force=True,
+    )
+
+
+_configure_logging()
 log = logging.getLogger(__name__)
 
 _ML_MODEL_ID = UUID("00000000-0000-4000-8000-000000000001")
