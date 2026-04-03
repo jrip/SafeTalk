@@ -72,12 +72,12 @@ def _startup_playbook() -> None:
         try:
             u1 = c.users.register(CreateUserInput(email="startup-a@local", password_hash="x", name="Startup A"))
         except Exception:
-            log.exception("startup register failed for startup-a@local; trying db lookup fallback")
+            #Тут при каждом запуске это делается, поэтому просто игнор ошибки
             u1 = _user_view_from_db(session, "startup-a@local")
         try:
             u2 = c.users.register(CreateUserInput(email="startup-b@local", password_hash="x", name="Startup B"))
         except Exception:
-            log.exception("startup register failed for startup-b@local; trying db lookup fallback")
+            #Тут при каждом запуске это делается, поэтому просто игнор ошибки
             u2 = _user_view_from_db(session, "startup-b@local")
 
         try:
