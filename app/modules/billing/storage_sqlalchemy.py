@@ -83,22 +83,3 @@ class SqlAlchemyBalanceStore(BalanceStore):
             )
             for r in rows
         ]
-
-    def list_ledger_for_user(self, user_id: UUID) -> list[BalanceLedgerEntryView]:
-        stmt = (
-            select(BalanceLedgerEntryModel)
-            .where(BalanceLedgerEntryModel.user_id == user_id)
-            .order_by(BalanceLedgerEntryModel.created_at.desc(), BalanceLedgerEntryModel.id.desc())
-        )
-        rows = self._session.scalars(stmt).all()
-        return [
-            BalanceLedgerEntryView(
-                id=r.id,
-                user_id=r.user_id,
-                kind=r.kind,
-                amount=r.amount,
-                task_id=r.task_id,
-                created_at=r.created_at,
-            )
-            for r in rows
-        ]

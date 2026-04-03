@@ -56,7 +56,7 @@ class BillingService(BillingInternalService):
         *,
         commit: bool = True,
     ) -> BalanceView:
-        state = self._balance_state(user_id)
+        state = self.load_balance_state_for_update(user_id)
         tx = CreditTransaction(user_id=user_id, amount=count, task_id=task_id)
         updated = self._apply_transaction(state, tx)
         if commit:
@@ -72,7 +72,7 @@ class BillingService(BillingInternalService):
         commit: bool = True,
         locked_state: BalanceState | None = None,
     ) -> BalanceView:
-        state = locked_state if locked_state is not None else self._balance_state(user_id)
+        state = locked_state if locked_state is not None else self.load_balance_state_for_update(user_id)
         if state.user_id != user_id:
             raise ValueError("locked_state.user_id does not match user_id")
         tx = DebitTransaction(user_id=user_id, amount=count, task_id=task_id)
