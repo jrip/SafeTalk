@@ -67,3 +67,10 @@ class MlPredictionTaskModel(Base):
         back_populates="ml_prediction_task",
         passive_deletes=True,
     )
+
+    def __repr__(self) -> str:
+        preview = self.text if len(self.text) <= 48 else f"{self.text[:45]}…"
+        return (
+            f"MlTask(id={self.id}, model_id={self.model_id}, status={self.status!r}, "
+            f"charged={self.charged_tokens}, text={preview!r})"
+        )

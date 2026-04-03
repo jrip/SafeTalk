@@ -69,5 +69,6 @@ class CreatePredictionTaskView:
     task_id: UUID
     user_id: UUID
     model_id: UUID
+    text: str
     status: TaskStatus
     charged_tokens: Decimal

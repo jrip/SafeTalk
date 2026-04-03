@@ -17,6 +17,7 @@ from app.db.database import SessionLocal, engine, get_db
 from app.db.seed import run_seed
 from app.modules.neural.models import MlPredictionTaskModel
 from app.modules.neural.types import RunPredictionInput
+from app.modules.users.models import UserModel
 from app.modules.users.types import CreateUserInput, UserView
 
 
@@ -32,6 +33,19 @@ _configure_logging()
 log = logging.getLogger(__name__)
 
 _ML_MODEL_ID = UUID("00000000-0000-4000-8000-000000000001")
+
+
+def _user_view_from_db(session: Session, email: str) -> UserView | None:
+    r = session.scalar(select(UserModel).where(UserModel.email == email.strip().lower()))
+    if r is None:
+        return None
+    return UserView(
+        id=r.id,
+        email=r.email,
+        name=r.name,
+        role=r.role,
+        allow_negative_balance=r.allow_negative_balance,
+    )
 
 
 def _init_db_schema_and_seed() -> None:
@@ -58,11 +72,11 @@ def _startup_playbook() -> None:
         try:
             u1 = c.users.register(CreateUserInput(email="startup-a@local", password_hash="x", name="Startup A"))
         except Exception:
-            pass
+            u1 = _user_view_from_db(session, "startup-a@local")
         try:
             u2 = c.users.register(CreateUserInput(email="startup-b@local", password_hash="x", name="Startup B"))
         except Exception:
-            pass
+            u2 = _user_view_from_db(session, "startup-b@local")
 
         try:
             if u1 is not None and u2 is not None:
@@ -103,14 +117,14 @@ def _startup_playbook() -> None:
 
                 log.info("startup history1 %r", c.history.get_user_history(u1.id))
                 log.info("startup history2 %r", c.history.get_user_history(u2.id))
-                log.info(
-                    "startup tasks1 %r",
-                    session.scalars(select(MlPredictionTaskModel).where(MlPredictionTaskModel.user_id == u1.id)).all(),
-                )
-                log.info(
-                    "startup tasks2 %r",
-                    session.scalars(select(MlPredictionTaskModel).where(MlPredictionTaskModel.user_id == u2.id)).all(),
-                )
+                tasks1 = session.scalars(
+                    select(MlPredictionTaskModel).where(MlPredictionTaskModel.user_id == u1.id)
+                ).all()
+                tasks2 = session.scalars(
+                    select(MlPredictionTaskModel).where(MlPredictionTaskModel.user_id == u2.id)
+                ).all()
+                log.info("startup tasks1 (%d)\n%s", len(tasks1), "\n".join(f"  {t}" for t in tasks1))
+                log.info("startup tasks2 (%d)\n%s", len(tasks2), "\n".join(f"  {t}" for t in tasks2))
         except Exception:
             session.rollback()
     finally:
@@ -119,6 +133,7 @@ def _startup_playbook() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _configure_logging()
     validate_settings()
     await asyncio.to_thread(_init_db_schema_and_seed)
     await asyncio.to_thread(_startup_playbook)

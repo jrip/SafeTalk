@@ -78,6 +78,7 @@ class NeuralService(NeuralInternalService):
             task_id=task.id,
             user_id=payload.user_id,
             model_id=payload.model_id,
+            text=text,
             status=TaskStatus.PENDING,
             charged_tokens=charge,
         )
