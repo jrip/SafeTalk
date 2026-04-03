@@ -17,11 +17,10 @@ from app.db.database import SessionLocal, engine, get_db
 from app.db.seed import run_seed
 from app.modules.neural.models import MlPredictionTaskModel
 from app.modules.neural.types import RunPredictionInput
-from app.modules.users.types import CreateUserInput
+from app.modules.users.types import CreateUserInput, UserView
 
 
 def _configure_logging() -> None:
-    """Чтобы `log.info` из приложения был виден в консоли при `python -m uvicorn`."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(levelname)s [%(name)s] %(message)s",
@@ -54,56 +53,66 @@ def _startup_playbook() -> None:
     try:
         c = build_app_container(session)
 
-        u1 = c.users.register(CreateUserInput(email="startup-a@local", password_hash="x", name="Startup A"))
-        log.info("startup user1 %s", u1)
-        u2 = c.users.register(CreateUserInput(email="startup-b@local", password_hash="x", name="Startup B"))
-        log.info("startup user2 %s", u2)
+        u1: UserView | None = None
+        u2: UserView | None = None
+        try:
+            u1 = c.users.register(CreateUserInput(email="startup-a@local", password_hash="x", name="Startup A"))
+        except Exception:
+            pass
+        try:
+            u2 = c.users.register(CreateUserInput(email="startup-b@local", password_hash="x", name="Startup B"))
+        except Exception:
+            pass
 
-        log.info("startup balance u1 (начало) %s", c.billing.get_available_tokens(u1.id))
-        log.info("startup balance u2 (начало) %s", c.billing.get_available_tokens(u2.id))
+        try:
+            if u1 is not None and u2 is not None:
+                log.info("startup user1 %s", u1)
+                log.info("startup user2 %s", u2)
 
-        log.info("startup пополнение u1 %s", c.billing.add_tokens(u1.id, Decimal("500")))
-        log.info("startup пополнение u2 %s", c.billing.add_tokens(u2.id, Decimal("500")))
+                log.info("startup balance u1 (начало) %s", c.billing.get_available_tokens(u1.id))
+                log.info("startup balance u2 (начало) %s", c.billing.get_available_tokens(u2.id))
 
-        log.info("startup balance u1 после пополнения %s", c.billing.get_available_tokens(u1.id))
-        log.info("startup balance u2 после пополнения %s", c.billing.get_available_tokens(u2.id))
+                log.info("startup пополнение u1 %s", c.billing.add_tokens(u1.id, Decimal("500")))
+                log.info("startup пополнение u2 %s", c.billing.add_tokens(u2.id, Decimal("500")))
 
-        log.info("startup списание u1 %s", c.billing.spend_tokens(u1.id, Decimal("42")))
+                log.info("startup balance u1 после пополнения %s", c.billing.get_available_tokens(u1.id))
+                log.info("startup balance u2 после пополнения %s", c.billing.get_available_tokens(u2.id))
 
-        log.info("startup balance u1 после списания %s", c.billing.get_available_tokens(u1.id))
+                log.info("startup списание u1 %s", c.billing.spend_tokens(u1.id, Decimal("42")))
 
-        log.info(
-            "startup ml1 %s",
-            c.neural.create_prediction_task(
-                RunPredictionInput(user_id=u1.id, model_id=_ML_MODEL_ID, text="hello toxicity check"),
-            ),
-        )
-        log.info(
-            "startup ml2 %s",
-            c.neural.create_prediction_task(
-                RunPredictionInput(user_id=u2.id, model_id=_ML_MODEL_ID, text="another ml run"),
-            ),
-        )
+                log.info("startup balance u1 после списания %s", c.billing.get_available_tokens(u1.id))
 
-        log.info("startup balance u1 после ML %s", c.billing.get_available_tokens(u1.id))
-        log.info("startup balance u2 после ML %s", c.billing.get_available_tokens(u2.id))
+                log.info(
+                    "startup ml1 %s",
+                    c.neural.create_prediction_task(
+                        RunPredictionInput(user_id=u1.id, model_id=_ML_MODEL_ID, text="hello toxicity check"),
+                    ),
+                )
+                log.info(
+                    "startup ml2 %s",
+                    c.neural.create_prediction_task(
+                        RunPredictionInput(user_id=u2.id, model_id=_ML_MODEL_ID, text="another ml run"),
+                    ),
+                )
 
-        log.info("startup журнал транзакций u1 %r", c.billing.get_ledger_history(u1.id))
-        log.info("startup журнал транзакций u2 %r", c.billing.get_ledger_history(u2.id))
+                log.info("startup balance u1 после ML %s", c.billing.get_available_tokens(u1.id))
+                log.info("startup balance u2 после ML %s", c.billing.get_available_tokens(u2.id))
 
-        log.info("startup history1 %r", c.history.get_user_history(u1.id))
-        log.info("startup history2 %r", c.history.get_user_history(u2.id))
-        log.info(
-            "startup tasks1 %r",
-            session.scalars(select(MlPredictionTaskModel).where(MlPredictionTaskModel.user_id == u1.id)).all(),
-        )
-        log.info(
-            "startup tasks2 %r",
-            session.scalars(select(MlPredictionTaskModel).where(MlPredictionTaskModel.user_id == u2.id)).all(),
-        )
-    except Exception:
-        session.rollback()
-        raise
+                log.info("startup журнал транзакций u1 %r", c.billing.get_ledger_history(u1.id))
+                log.info("startup журнал транзакций u2 %r", c.billing.get_ledger_history(u2.id))
+
+                log.info("startup history1 %r", c.history.get_user_history(u1.id))
+                log.info("startup history2 %r", c.history.get_user_history(u2.id))
+                log.info(
+                    "startup tasks1 %r",
+                    session.scalars(select(MlPredictionTaskModel).where(MlPredictionTaskModel.user_id == u1.id)).all(),
+                )
+                log.info(
+                    "startup tasks2 %r",
+                    session.scalars(select(MlPredictionTaskModel).where(MlPredictionTaskModel.user_id == u2.id)).all(),
+                )
+        except Exception:
+            session.rollback()
     finally:
         session.close()
 
