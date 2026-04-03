@@ -82,55 +82,53 @@ def _startup_playbook() -> None:
 
         try:
             if u1 is not None and u2 is not None:
-                log.info("startup user1 %s", u1)
-                log.info("startup user2 %s", u2)
+                log.info("Пользователь 1: %s", u1)
+                log.info("Пользователь 2: %s", u2)
 
-                log.info("startup balance u1 (начало) %s", c.billing.get_count_tokens(u1.id))
-                log.info("startup balance u2 (начало) %s", c.billing.get_count_tokens(u2.id))
+                spend_amount = Decimal("42")
+                topup_amount = Decimal("500")
 
-                log.info("startup пополнение u1 %s", c.billing.add_tokens(u1.id, Decimal("500")))
-                log.info("startup пополнение u2 %s", c.billing.add_tokens(u2.id, Decimal("500")))
+                log.info("u1 баланс: %s", c.billing.get_count_tokens(u1.id).token_count)
+                log.info("u1 списываю: %s", spend_amount)
+                log.info("u1 стало: %s", c.billing.spend_tokens(u1.id, spend_amount).token_count)
+                log.info("u1 добавляю: %s", topup_amount)
+                log.info("u1 стало: %s", c.billing.add_tokens(u1.id, topup_amount).token_count)
 
-                log.info("startup balance u1 после пополнения %s", c.billing.get_count_tokens(u1.id))
-                log.info("startup balance u2 после пополнения %s", c.billing.get_count_tokens(u2.id))
+                log.info("u2 баланс: %s", c.billing.get_count_tokens(u2.id).token_count)
+                log.info("u2 списываю: %s", spend_amount)
+                log.info("u2 стало: %s", c.billing.spend_tokens(u2.id, spend_amount).token_count)
+                log.info("u2 добавляю: %s", topup_amount)
+                log.info("u2 стало: %s", c.billing.add_tokens(u2.id, topup_amount).token_count)
 
-                log.info("startup списание u1 %s", c.billing.spend_tokens(u1.id, Decimal("42")))
-
-                log.info("startup balance u1 после списания %s", c.billing.get_count_tokens(u1.id))
-
-                log.info(
-                    "startup ml1 %s",
-                    c.neural.create_prediction_task(
-                        RunPredictionInput(user_id=u1.id, model_id=_ML_MODEL_ID, text="hello toxicity check"),
-                    ),
+                ml1 = c.neural.create_prediction_task(
+                    RunPredictionInput(user_id=u1.id, model_id=_ML_MODEL_ID, text="hello toxicity check"),
                 )
-                log.info(
-                    "startup ml2 %s",
-                    c.neural.create_prediction_task(
-                        RunPredictionInput(user_id=u2.id, model_id=_ML_MODEL_ID, text="another ml run"),
-                    ),
+                log.info("u1 ML-задача создана: task_id=%s, цена=%s", ml1.task_id, ml1.charged_tokens)
+                log.info("u1 баланс после ML: %s", c.billing.get_count_tokens(u1.id).token_count)
+
+                ml2 = c.neural.create_prediction_task(
+                    RunPredictionInput(user_id=u2.id, model_id=_ML_MODEL_ID, text="another ml run"),
                 )
+                log.info("u2 ML-задача создана: task_id=%s, цена=%s", ml2.task_id, ml2.charged_tokens)
+                log.info("u2 баланс после ML: %s", c.billing.get_count_tokens(u2.id).token_count)
 
-                log.info("startup balance u1 после ML %s", c.billing.get_count_tokens(u1.id))
-                log.info("startup balance u2 после ML %s", c.billing.get_count_tokens(u2.id))
+                log.info("Журнал транзакций u1: %r", c.billing.get_ledger_history(u1.id))
+                log.info("Журнал транзакций u2: %r", c.billing.get_ledger_history(u2.id))
 
-                log.info("startup журнал транзакций u1 %r", c.billing.get_ledger_history(u1.id))
-                log.info("startup журнал транзакций u2 %r", c.billing.get_ledger_history(u2.id))
-
-                log.info("startup history1 %r", c.history.get_api_history(u1.id))
-                log.info("startup history2 %r", c.history.get_api_history(u2.id))
+                log.info("История запросов u1: %r", c.history.get_api_history(u1.id))
+                log.info("История запросов u2: %r", c.history.get_api_history(u2.id))
                 tasks1 = session.scalars(
                     select(MlPredictionTaskModel).where(MlPredictionTaskModel.user_id == u1.id)
                 ).all()
                 tasks2 = session.scalars(
                     select(MlPredictionTaskModel).where(MlPredictionTaskModel.user_id == u2.id)
                 ).all()
-                log.info("startup tasks1 (%d)\n%s", len(tasks1), "\n".join(f"  {t}" for t in tasks1))
-                log.info("startup tasks2 (%d)\n%s", len(tasks2), "\n".join(f"  {t}" for t in tasks2))
+                log.info("Список ML-задач u1 (%d)\n%s", len(tasks1), "\n".join(f"  {t}" for t in tasks1))
+                log.info("Список ML-задач u2 (%d)\n%s", len(tasks2), "\n".join(f"  {t}" for t in tasks2))
             else:
-                log.warning("startup playbook skipped: users unresolved (u1=%r, u2=%r)", u1, u2)
+                log.warning("Сценарий пропущен: пользователи не определены (u1=%r, u2=%r)", u1, u2)
         except Exception:
-            log.exception("startup playbook failed")
+            log.exception("Ошибка при выполнении сценария на старте")
             session.rollback()
     finally:
         session.close()
