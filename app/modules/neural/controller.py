@@ -7,6 +7,7 @@ from app.modules.neural.types import (
     BatchTaskResultView,
     BatchTaskView,
     CreateBatchTaskInput,
+    CreatePredictionTaskView,
     PredictionView,
     RunPredictionInput,
 )
@@ -19,6 +20,10 @@ class NeuralController:
     def get_toxicity(self, payload: RunPredictionInput) -> PredictionView:
         """Получить токсичность одного диалога."""
         return self._service.get_toxicity(payload)
+
+    def create_prediction_task(self, payload: RunPredictionInput) -> CreatePredictionTaskView:
+        """Создать ML-задачу: проверка баланса, списание по числу символов."""
+        return self._service.create_prediction_task(payload)
 
     def create_batch_task(self, payload: CreateBatchTaskInput) -> BatchTaskView:
         """Создать задачу на анализ пачки диалогов."""

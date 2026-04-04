@@ -7,6 +7,7 @@ from app.modules.neural.types import (
     BatchTaskResultView,
     BatchTaskView,
     CreateBatchTaskInput,
+    CreatePredictionTaskView,
     PredictionView,
     RunPredictionInput,
 )
@@ -15,6 +16,9 @@ from app.modules.neural.types import (
 class NeuralPublicService(Protocol):
     def get_toxicity(self, payload: RunPredictionInput) -> PredictionView:
         """Внешний метод: получить токсичность диалога."""
+
+    def create_prediction_task(self, payload: RunPredictionInput) -> CreatePredictionTaskView:
+        """Создать задачу на предикт: биллинг по длине текста, без запуска модели (очередь — позже)."""
 
     def create_batch_task(self, payload: CreateBatchTaskInput) -> BatchTaskView:
         """Внешний метод: создать задачу на анализ пачки диалогов."""

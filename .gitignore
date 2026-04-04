@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 .venv/
 app.db
+safetalk_local.db
+**/.env

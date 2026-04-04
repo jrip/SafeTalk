@@ -15,7 +15,7 @@ class MLModel:
 
     name: str
     description: str
-    price_per_prediction: Decimal
+    price_per_character: Decimal
     id: UUID = field(default_factory=uuid4)
 
 
