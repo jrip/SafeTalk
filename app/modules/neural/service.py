@@ -6,11 +6,10 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core import NotFoundError, ValidationError
-from app.modules.billing.interfaces import BillingInternalService
-from app.modules.history.interfaces import HistoryInternalService
+from app.modules.billing.service import BillingService
+from app.modules.history.service import HistoryService
 from app.modules.neural.entities import MLTask
-from app.modules.neural.interfaces import NeuralInternalService
-from app.modules.neural.ports import MlModelCatalog, MlTaskStore
+from app.modules.neural.storage_sqlalchemy import SqlAlchemyMlModelCatalog, SqlAlchemyMlTaskStore
 from app.modules.neural.types import (
     BatchTaskResultView,
     BatchTaskView,
@@ -22,14 +21,14 @@ from app.modules.neural.types import (
 )
 
 
-class NeuralService(NeuralInternalService):
+class NeuralService:
     def __init__(
         self,
         session: Session,
-        billing: BillingInternalService,
-        ml_models: MlModelCatalog,
-        history: HistoryInternalService,
-        ml_tasks: MlTaskStore,
+        billing: BillingService,
+        ml_models: SqlAlchemyMlModelCatalog,
+        history: HistoryService,
+        ml_tasks: SqlAlchemyMlTaskStore,
     ) -> None:
         self._session = session
         self._billing = billing

@@ -1,0 +1,61 @@
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from starlette import status
+
+from app.core.exceptions import DomainError, InsufficientBalanceError, NotFoundError, ValidationError
+
+
+def _error_payload(error: str, message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "error": error,
+        "message": message,
+    }
+    if details:
+        payload["details"] = details
+    return payload
+
+
+def register_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(ValidationError)
+    async def handle_validation_error(_: Request, exc: ValidationError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=_error_payload("validation_error", str(exc)),
+        )
+
+    @app.exception_handler(NotFoundError)
+    async def handle_not_found_error(_: Request, exc: NotFoundError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=_error_payload("not_found", str(exc)),
+        )
+
+    @app.exception_handler(InsufficientBalanceError)
+    async def handle_insufficient_balance(_: Request, exc: InsufficientBalanceError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content=_error_payload("insufficient_balance", str(exc)),
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def handle_request_validation(_: Request, exc: RequestValidationError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content=_error_payload(
+                "request_validation_error",
+                "Invalid request payload",
+                {"fields": exc.errors()},
+            ),
+        )
+
+    @app.exception_handler(DomainError)
+    async def handle_domain_error(_: Request, exc: DomainError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=_error_payload("domain_error", str(exc)),
+        )

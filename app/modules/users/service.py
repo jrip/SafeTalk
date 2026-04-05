@@ -6,15 +6,14 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core import NotFoundError, ValidationError
-from app.modules.billing.ports import BalanceStore
+from app.modules.billing.storage_sqlalchemy import SqlAlchemyBalanceStore
 from app.modules.users.entities import User
-from app.modules.users.interfaces import UsersInternalService
-from app.modules.users.ports import UserStore
+from app.modules.users.storage_sqlalchemy import SqlAlchemyUserStore
 from app.modules.users.types import AuthInput, AuthTokenView, CreateUserInput, UpdateUserInput, UserView
 
 
-class UserService(UsersInternalService):
-    def __init__(self, users: UserStore, balance: BalanceStore, session: Session) -> None:
+class UserService:
+    def __init__(self, users: SqlAlchemyUserStore, balance: SqlAlchemyBalanceStore, session: Session) -> None:
         self._users = users
         self._balance = balance
         self._session = session

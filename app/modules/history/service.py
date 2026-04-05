@@ -5,13 +5,12 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.modules.history.interfaces import HistoryInternalService
-from app.modules.history.ports import HistoryStore
+from app.modules.history.storage_sqlalchemy import SqlAlchemyHistoryStore
 from app.modules.history.types import HistoryView
 
 
-class HistoryService(HistoryInternalService):
-    def __init__(self, history: HistoryStore, session: Session) -> None:
+class HistoryService:
+    def __init__(self, history: SqlAlchemyHistoryStore, session: Session) -> None:
         self._history = history
         self._session = session
 

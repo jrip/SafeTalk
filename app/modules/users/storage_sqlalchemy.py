@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 from app.core import NotFoundError
 from app.modules.users.entities import User
 from app.modules.users.models import UserModel
-from app.modules.users.ports import UserStore
 
 
 def _user_from_model(row: UserModel) -> User:
@@ -33,7 +32,7 @@ def _user_to_model(user: User) -> UserModel:
     )
 
 
-class SqlAlchemyUserStore(UserStore):
+class SqlAlchemyUserStore:
     def __init__(self, session: Session) -> None:
         self._session = session
 

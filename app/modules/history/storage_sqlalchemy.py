@@ -8,11 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.modules.history.entities import HistoryRecord
 from app.modules.history.models import HistoryRecordModel
-from app.modules.history.ports import HistoryStore
 from app.modules.history.types import HistoryView
 
 
-class SqlAlchemyHistoryStore(HistoryStore):
+class SqlAlchemyHistoryStore:
     def __init__(self, session: Session) -> None:
         self._session = session
 

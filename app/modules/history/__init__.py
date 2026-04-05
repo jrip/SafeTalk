@@ -1,9 +1,6 @@
-from .controller import HistoryController
-from .interfaces import HistoryPublicService
-from .types import HistoryView
+from .types import CreateHistoryInput, HistoryView
 
 __all__ = [
-    "HistoryController",
-    "HistoryPublicService",
+    "CreateHistoryInput",
     "HistoryView",
 ]

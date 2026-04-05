@@ -6,14 +6,20 @@ from contextlib import asynccontextmanager
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import Depends, FastAPI
-from sqlalchemy import select, text
+from fastapi import FastAPI
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.bootstrap import AppContainer, build_app_container
+from app.core.error_handlers import register_exception_handlers
 from app.core.settings import validate_settings
 from app.db.config import Base  # подгружает модели в Base.metadata
-from app.db.database import SessionLocal, engine, get_db
+from app.db.database import SessionLocal, engine
+from app.modules.billing.routes import router as balance_router
+from app.modules.history.routes import router as history_router
+from app.modules.neural.routes import router as predict_router
+from app.modules.system.routes import router as system_router
+from app.modules.users.routes import router as auth_router, users_router
 from app.db.seed import run_seed
 from app.modules.neural.models import MlPredictionTaskModel
 from app.modules.neural.types import RunPredictionInput
@@ -144,18 +150,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="SafeTalk", lifespan=lifespan)
-
-
-def get_app_container(session: Session = Depends(get_db)) -> AppContainer:
-    return build_app_container(session)
-
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.get("/health/db")
-def health_db(session: Session = Depends(get_db)) -> dict[str, str]:
-    session.execute(text("SELECT 1"))
-    return {"status": "ok", "database": "connected"}
+register_exception_handlers(app)
+app.include_router(system_router)
+app.include_router(auth_router)
+app.include_router(users_router)
+app.include_router(balance_router)
+app.include_router(predict_router)
+app.include_router(history_router)

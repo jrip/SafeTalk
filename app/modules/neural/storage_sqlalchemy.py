@@ -7,11 +7,10 @@ from sqlalchemy.orm import Session
 
 from app.modules.neural.entities import MLTask
 from app.modules.neural.models import MlModelModel, MlPredictionTaskModel
-from app.modules.neural.ports import MlModelCatalog, MlTaskStore
 from app.modules.neural.types import MlModelMeta
 
 
-class SqlAlchemyMlModelCatalog(MlModelCatalog):
+class SqlAlchemyMlModelCatalog:
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -26,7 +25,7 @@ class SqlAlchemyMlModelCatalog(MlModelCatalog):
         )
 
 
-class SqlAlchemyMlTaskStore(MlTaskStore):
+class SqlAlchemyMlTaskStore:
     def __init__(self, session: Session) -> None:
         self._session = session
 
