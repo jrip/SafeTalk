@@ -13,7 +13,13 @@ from app.bootstrap import build_app_container
 from app.core.api_models import ErrorResponse
 from app.core import ValidationError
 from app.db.database import get_db
-from app.modules.users.auth import issue_access_token, require_user_id
+from app.modules.users.auth import (
+    is_user_email_verified,
+    issue_access_token,
+    issue_email_verification,
+    require_user_id,
+    verify_email_code,
+)
 from app.modules.users.types import AuthInput, CreateUserInput, UpdateUserInput
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -32,6 +38,11 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1)
 
 
+class VerifyEmailRequest(BaseModel):
+    email: str
+    code: str = Field(min_length=1, max_length=32)
+
+
 class UpdateMeRequest(BaseModel):
     name: str = Field(min_length=1)
 
@@ -46,6 +57,10 @@ class UserResponse(BaseModel):
 
 class AuthTokenResponse(BaseModel):
     access_token: str
+
+
+class VerifyEmailResponse(BaseModel):
+    status: str
 
 
 def _container(session: Session = Depends(get_db)):
@@ -75,9 +90,9 @@ def register(payload: RegisterRequest, c=Depends(_container)) -> dict[str, Any]:
             name=payload.name,
         )
     )
-    verification_code = f"{user.id.hex[:6].upper()}"
+    verification_code = issue_email_verification(user.id, user.email)
     log.info(
-        "registration mock email sent to %s; pending verification code=%s",
+        "registration mock email sent to %s; pending verification code=%s (future: real email provider)",
         user.email,
         verification_code,
     )
@@ -85,10 +100,26 @@ def register(payload: RegisterRequest, c=Depends(_container)) -> dict[str, Any]:
 
 
 @router.post(
+    "/verify-email",
+    response_model=VerifyEmailResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
+def verify_email(payload: VerifyEmailRequest, c=Depends(_container)) -> dict[str, Any]:
+    user = c.users.get_profile_by_email(payload.email)
+    verified_user_id = verify_email_code(payload.email, payload.code)
+    if verified_user_id is None or verified_user_id != user.id:
+        raise ValidationError("Invalid verification code")
+    return {"status": "verified"}
+
+
+@router.post(
     "/login",
     response_model=AuthTokenResponse,
     responses={
-        501: {"model": ErrorResponse},
         400: {"model": ErrorResponse},
         401: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
@@ -98,6 +129,8 @@ def register(payload: RegisterRequest, c=Depends(_container)) -> dict[str, Any]:
 def login(payload: LoginRequest, c=Depends(_container)) -> dict[str, Any]:
     auth_view = c.users.get_auth_token(AuthInput(email=payload.email, password_hash=payload.password))
     user = c.users.get_profile(UUID(auth_view.access_token))
+    if not is_user_email_verified(user.id):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email is not verified")
     token = issue_access_token(user.id)
     return {"access_token": token}
 

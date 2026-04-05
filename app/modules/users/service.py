@@ -61,6 +61,19 @@ class UserService:
             allow_negative_balance=user.allow_negative_balance,
         )
 
+    def get_profile_by_email(self, email: str) -> UserView:
+        normalized_email = email.strip().lower()
+        user = self._users.get_by_email(normalized_email)
+        if user is None:
+            raise NotFoundError("User not found")
+        return UserView(
+            id=user.id,
+            email=user.email,
+            name=user.name,
+            role=user.role,
+            allow_negative_balance=user.allow_negative_balance,
+        )
+
     def update_profile(self, user_id: UUID, payload: UpdateUserInput) -> UserView:
         user = self._users.get_by_id(user_id)
         if user is None:

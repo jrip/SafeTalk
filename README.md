@@ -45,6 +45,14 @@ docker compose up -d --build
 - `models.py` - ORM-модели и связи
 - `types.py` - DTO для обмена между слоями
 
+### Модули
+
+- `app/modules/users` - регистрация, логин, профиль пользователя, базовая auth-логика
+- `app/modules/billing` - баланс, пополнение, списание, журнал транзакций
+- `app/modules/neural` - запуск ML-предикта, расчет стоимости, создание ML-задач
+- `app/modules/history` - история запросов и операций пользователя
+- `app/modules/system` - технические health-check эндпоинты
+
 ### Базовые принципы
 
 - Роуты валидируют вход и вызывают сервисы; бизнес-логика в `service.py`.
@@ -82,15 +90,14 @@ docker compose up -d --build
 | `GET` | `/health` | Liveness probe приложения | No | Проверка, что процесс жив |
 | `GET` | `/health/db` | Readiness probe БД | No | Проверка соединения с БД |
 | `POST` | `/auth/register` | Регистрация пользователя | No | Создает пользователя и кошелек |
-| `POST` | `/auth/login` | Логин пользователя | No | Сейчас заглушка, возвращает `501` |
-| `GET` | `/users/{user_id}` | Профиль пользователя | No* | Сейчас принимает `user_id` в URL |
-| `PATCH` | `/users/{user_id}` | Обновление профиля | No* | Сейчас принимает `user_id` в URL |
-| `GET` | `/balance/{user_id}` | Текущий баланс | No* | Сейчас принимает `user_id` в URL |
-| `POST` | `/balance/{user_id}/topup` | Пополнение баланса | No* | Возвращает обновленный баланс |
-| `POST` | `/balance/{user_id}/spend` | Списание токенов | No* | При нехватке средств -> `409` |
-| `GET` | `/balance/{user_id}/ledger` | История транзакций | No* | Новые записи сверху |
-| `POST` | `/predict` | Создать ML-задачу | No* | Списывает токены и пишет историю |
-| `GET` | `/history/{user_id}` | История ML-запросов | No* | По пользователю |
-
-`No*` означает, что текущая версия API еще не переведена на auth-context (`current user`) и использует `user_id` из пути/тела запроса.
+| `POST` | `/auth/verify-email` | Подтверждение email | No | Проверяет код подтверждения из mock-письма (в логах) |
+| `POST` | `/auth/login` | Логин пользователя | No | Возвращает `access_token`; вход только после verify-email |
+| `GET` | `/users/{user_id}` | Профиль пользователя | Bearer | Доступ только к своему `user_id` |
+| `PATCH` | `/users/{user_id}` | Обновление профиля | Bearer | Доступ только к своему `user_id` |
+| `GET` | `/balance/{user_id}` | Текущий баланс | Bearer | Доступ только к своему `user_id` |
+| `POST` | `/balance/{user_id}/topup` | Пополнение баланса | Bearer | Возвращает обновленный баланс |
+| `POST` | `/balance/{user_id}/spend` | Списание токенов | Bearer | При нехватке средств -> `409` |
+| `GET` | `/balance/{user_id}/ledger` | История транзакций | Bearer | Новые записи сверху |
+| `POST` | `/predict` | Создать ML-задачу | Bearer | `user_id` берется из токена; списывает токены и пишет историю |
+| `GET` | `/history/{user_id}` | История ML-запросов | Bearer | Доступ только к своему `user_id` |
 
