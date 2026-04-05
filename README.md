@@ -99,9 +99,9 @@ docker compose up -d --build
 | `GET` | `/users/{user_id}` | Профиль пользователя | Bearer | Доступ только к своему `user_id` |
 | `PATCH` | `/users/{user_id}` | Обновление профиля | Bearer | Доступ только к своему `user_id` |
 | `GET` | `/balance/{user_id}` | Текущий баланс | Bearer | Доступ только к своему `user_id` |
-| `POST` | `/balance/{user_id}/topup` | Пополнение баланса | Bearer | Возвращает обновленный баланс |
-| `POST` | `/balance/{user_id}/spend` | Списание токенов | Bearer | При нехватке средств -> `409` |
-| `GET` | `/balance/{user_id}/ledger` | История транзакций | Bearer | Новые записи сверху |
+| `POST` | `/balance/{user_id}/topup` | Пополнение баланса | Bearer (admin) | Только admin; можно пополнять баланс любого пользователя |
+| `POST` | `/balance/{user_id}/spend` | Списание токенов | Bearer (admin) | Только admin; можно списывать у любого пользователя |
+| `GET` | `/balance/{user_id}/ledger` | История транзакций | Bearer | Доступ только к своему `user_id` |
 | `POST` | `/predict` | Создать ML-задачу | Bearer | `user_id` берется из токена; списывает токены и пишет историю |
 | `GET` | `/history/{user_id}` | История ML-запросов | Bearer | Доступ только к своему `user_id` |
 

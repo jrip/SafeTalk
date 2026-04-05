@@ -49,6 +49,12 @@ def _as_json(payload: Any) -> dict[str, Any]:
     return asdict(payload)
 
 
+def _require_admin(c: Any, current_user_id: UUID) -> None:
+    me = c.users.get_profile(current_user_id)
+    if me.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+
 @router.get(
     "/{user_id}",
     response_model=BalanceResponse,
@@ -83,8 +89,7 @@ def topup(
     c=Depends(_container),
     current_user_id: UUID = Depends(require_user_id),
 ) -> dict[str, Any]:
-    if current_user_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    _require_admin(c, current_user_id)
     return _as_json(c.billing.add_tokens(user_id, payload.amount))
 
 
@@ -106,8 +111,7 @@ def spend(
     c=Depends(_container),
     current_user_id: UUID = Depends(require_user_id),
 ) -> dict[str, Any]:
-    if current_user_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    _require_admin(c, current_user_id)
     return _as_json(c.billing.spend_tokens(user_id, payload.amount))
 
 
