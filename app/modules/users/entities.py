@@ -8,8 +8,7 @@ from uuid import UUID, uuid4
 class User:
     """Plain data model for Users domain."""
 
-    email: str
-    password_hash: str
+    password_hash: str = "identity-managed"
     name: str
     role: str = "user"
     allow_negative_balance: bool = False

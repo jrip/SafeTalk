@@ -10,11 +10,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.bootstrap import build_app_container
-from app.core.api_models import ErrorResponse
 from app.core import ValidationError
+from app.core.api_models import ErrorResponse
 from app.db.database import get_db
 from app.modules.users.auth import (
-    is_user_email_verified,
+    get_email_verification_status,
     issue_access_token,
     issue_email_verification,
     require_user_id,
@@ -28,18 +28,18 @@ log = logging.getLogger(__name__)
 
 
 class RegisterRequest(BaseModel):
-    email: str
+    login: str
     password: str = Field(min_length=1)
     name: str = Field(min_length=1)
 
 
 class LoginRequest(BaseModel):
-    email: str
+    login: str
     password: str = Field(min_length=1)
 
 
 class VerifyEmailRequest(BaseModel):
-    email: str
+    login: str
     code: str = Field(min_length=1, max_length=32)
 
 
@@ -49,10 +49,10 @@ class UpdateMeRequest(BaseModel):
 
 class UserResponse(BaseModel):
     id: UUID
-    email: str
     name: str
     role: str
     allow_negative_balance: bool
+    identities: list[str]
 
 
 class AuthTokenResponse(BaseModel):
@@ -61,6 +61,8 @@ class AuthTokenResponse(BaseModel):
 
 class VerifyEmailResponse(BaseModel):
     status: str
+    attempts_left: int
+    expires_in_seconds: int
 
 
 def _container(session: Session = Depends(get_db)):
@@ -81,22 +83,26 @@ def _as_json(payload: Any) -> dict[str, Any]:
     },
 )
 def register(payload: RegisterRequest, c=Depends(_container)) -> dict[str, Any]:
-    if "@" not in payload.email or "." not in payload.email:
+    if not payload.login.strip():
+        raise ValidationError("Login cannot be empty")
+    if "@" not in payload.login or "." not in payload.login:
         raise ValidationError("Email format is invalid")
     user = c.users.register(
         CreateUserInput(
-            email=payload.email,
-            password_hash=payload.password,
             name=payload.name,
         )
     )
-    verification_code = issue_email_verification(user.id, user.email)
+    c.users.register_email_identity(user.id, payload.login, payload.password)
+    verification_code = issue_email_verification(user.id, payload.login)
     log.info(
-        "registration mock email sent to %s; pending verification code=%s (future: real email provider)",
-        user.email,
+        "registration mock email sent to login=%s; pending verification code=%s (future: real email provider)",
+        payload.login,
         verification_code,
     )
-    return _as_json(user)
+    identities = c.users.get_identities(user.id)
+    data = _as_json(user)
+    data["identities"] = [f"{i.identity_type}:{i.identifier}" for i in identities]
+    return data
 
 
 @router.post(
@@ -109,11 +115,20 @@ def register(payload: RegisterRequest, c=Depends(_container)) -> dict[str, Any]:
     },
 )
 def verify_email(payload: VerifyEmailRequest, c=Depends(_container)) -> dict[str, Any]:
-    user = c.users.get_profile_by_email(payload.email)
-    verified_user_id = verify_email_code(payload.email, payload.code)
-    if verified_user_id is None or verified_user_id != user.id:
-        raise ValidationError("Invalid verification code")
-    return {"status": "verified"}
+    identity = c.users.get_email_identity(payload.login)
+    if identity is None:
+        raise ValidationError("User not found")
+    verified_user_id = verify_email_code(payload.login, payload.code)
+    if verified_user_id is None or verified_user_id != identity.user_id:
+        status_info = get_email_verification_status(payload.login)
+        if status_info["attempts_left"] <= 0 or status_info["expires_in_seconds"] <= 0:
+            raise ValidationError("Verification code expired or attempts exceeded. Please register again.")
+        raise ValidationError(
+            f"Invalid verification code. Attempts left: {status_info['attempts_left']}, "
+            f"expires in: {status_info['expires_in_seconds']}s"
+        )
+    c.users.verify_email_identity(payload.login)
+    return {"status": "verified", "attempts_left": 0, "expires_in_seconds": 0}
 
 
 @router.post(
@@ -127,11 +142,10 @@ def verify_email(payload: VerifyEmailRequest, c=Depends(_container)) -> dict[str
     },
 )
 def login(payload: LoginRequest, c=Depends(_container)) -> dict[str, Any]:
-    auth_view = c.users.get_auth_token(AuthInput(email=payload.email, password_hash=payload.password))
-    user = c.users.get_profile(UUID(auth_view.access_token))
-    if not is_user_email_verified(user.id):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email is not verified")
-    token = issue_access_token(user.id)
+    auth_view = c.users.get_auth_token(
+        AuthInput(identity_type="email", identifier=payload.login, password_hash=payload.password)
+    )
+    token = issue_access_token(UUID(auth_view.access_token))
     return {"access_token": token}
 
 
@@ -148,7 +162,11 @@ def login(payload: LoginRequest, c=Depends(_container)) -> dict[str, Any]:
 def get_user(user_id: UUID, c=Depends(_container), current_user_id: UUID = Depends(require_user_id)) -> dict[str, Any]:
     if current_user_id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-    return _as_json(c.users.get_profile(user_id))
+    user = c.users.get_profile(user_id)
+    identities = c.users.get_identities(user_id)
+    data = _as_json(user)
+    data["identities"] = [f"{i.identity_type}:{i.identifier}" for i in identities]
+    return data
 
 
 @users_router.patch(
@@ -171,4 +189,7 @@ def update_user(
     if current_user_id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     updated = c.users.update_profile(user_id, UpdateUserInput(name=payload.name))
-    return _as_json(updated)
+    identities = c.users.get_identities(user_id)
+    data = _as_json(updated)
+    data["identities"] = [f"{i.identity_type}:{i.identifier}" for i in identities]
+    return data

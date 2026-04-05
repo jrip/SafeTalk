@@ -19,11 +19,12 @@ from app.modules.billing.routes import router as balance_router
 from app.modules.history.routes import router as history_router
 from app.modules.neural.routes import router as predict_router
 from app.modules.system.routes import router as system_router
+from app.modules.telegram.routes import router as telegram_router
 from app.modules.users.routes import router as auth_router, users_router
 from app.db.seed import run_seed
 from app.modules.neural.models import MlPredictionTaskModel
 from app.modules.neural.types import RunPredictionInput
-from app.modules.users.models import UserModel
+from app.modules.users.models import UserIdentityModel, UserModel
 from app.modules.users.types import CreateUserInput, UserView
 
 
@@ -41,13 +42,20 @@ log = logging.getLogger(__name__)
 _ML_MODEL_ID = UUID("00000000-0000-4000-8000-000000000001")
 
 
-def _user_view_from_db(session: Session, email: str) -> UserView | None:
-    r = session.scalar(select(UserModel).where(UserModel.email == email.strip().lower()))
+def _user_view_from_db(session: Session, login: str) -> UserView | None:
+    identity = session.scalar(
+        select(UserIdentityModel).where(
+            UserIdentityModel.identity_type == "email",
+            UserIdentityModel.identifier == login.strip().lower(),
+        )
+    )
+    if identity is None:
+        return None
+    r = session.get(UserModel, identity.user_id)
     if r is None:
         return None
     return UserView(
         id=r.id,
-        email=r.email,
         name=r.name,
         role=r.role,
         allow_negative_balance=r.allow_negative_balance,
@@ -76,12 +84,14 @@ def _startup_playbook() -> None:
         u1: UserView | None = None
         u2: UserView | None = None
         try:
-            u1 = c.users.register(CreateUserInput(email="startup-a@local", password_hash="x", name="Startup A"))
+            u1 = c.users.register(CreateUserInput(name="Startup A"))
+            c.users.register_email_identity(u1.id, "startup-a@local", "x")
         except Exception:
             #Тут при каждом запуске это делается, поэтому просто игнор ошибки
             u1 = _user_view_from_db(session, "startup-a@local")
         try:
-            u2 = c.users.register(CreateUserInput(email="startup-b@local", password_hash="x", name="Startup B"))
+            u2 = c.users.register(CreateUserInput(name="Startup B"))
+            c.users.register_email_identity(u2.id, "startup-b@local", "x")
         except Exception:
             #Тут при каждом запуске это делается, поэтому просто игнор ошибки
             u2 = _user_view_from_db(session, "startup-b@local")
@@ -153,6 +163,7 @@ app = FastAPI(title="SafeTalk", lifespan=lifespan)
 register_exception_handlers(app)
 app.include_router(system_router)
 app.include_router(auth_router)
+app.include_router(telegram_router)
 app.include_router(users_router)
 app.include_router(balance_router)
 app.include_router(predict_router)

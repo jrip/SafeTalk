@@ -3,10 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
+
 @dataclass(frozen=True)
 class CreateUserInput:
-    email: str
-    password_hash: str
     name: str
     role: str = "user"
 
@@ -18,7 +17,8 @@ class UpdateUserInput:
 
 @dataclass(frozen=True)
 class AuthInput:
-    email: str
+    identity_type: str
+    identifier: str
     password_hash: str
 
 
@@ -30,7 +30,24 @@ class AuthTokenView:
 @dataclass(frozen=True)
 class UserView:
     id: UUID
-    email: str
     name: str
     role: str = "user"
     allow_negative_balance: bool = False
+
+
+@dataclass(frozen=True)
+class UserIdentityView:
+    user_id: UUID
+    identity_type: str
+    identifier: str
+    is_verified: bool
+    secret_hash: str | None = None
+
+
+@dataclass(frozen=True)
+class CreateIdentityInput:
+    user_id: UUID
+    identity_type: str
+    identifier: str
+    secret_hash: str | None = None
+    is_verified: bool = False

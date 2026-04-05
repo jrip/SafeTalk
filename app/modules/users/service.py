@@ -9,7 +9,15 @@ from app.core import NotFoundError, ValidationError
 from app.modules.billing.storage_sqlalchemy import SqlAlchemyBalanceStore
 from app.modules.users.entities import User
 from app.modules.users.storage_sqlalchemy import SqlAlchemyUserStore
-from app.modules.users.types import AuthInput, AuthTokenView, CreateUserInput, UpdateUserInput, UserView
+from app.modules.users.types import (
+    AuthInput,
+    AuthTokenView,
+    CreateIdentityInput,
+    CreateUserInput,
+    UpdateUserInput,
+    UserIdentityView,
+    UserView,
+)
 
 
 class UserService:
@@ -19,60 +27,81 @@ class UserService:
         self._session = session
 
     def register(self, payload: CreateUserInput) -> UserView:
-        email = payload.email.strip().lower()
-        if self._users.get_by_email(email):
-            raise ValidationError("Email already registered")
         name = self.normalize_name(payload.name)
         user = User(
-            email=email,
-            password_hash=payload.password_hash,
             name=name,
             role=payload.role,
         )
         self._users.add(user)
         self._balance.ensure_wallet(user.id)
-        self._session.commit()
-        return UserView(
-            id=user.id,
-            email=user.email,
-            name=user.name,
-            role=user.role,
-            allow_negative_balance=user.allow_negative_balance,
+        return self._to_user_view(user)
+
+    def register_email_identity(self, user_id: UUID, login: str, password_hash: str) -> UserIdentityView:
+        normalized_login = login.strip().lower()
+        if self._users.get_identity("email", normalized_login):
+            raise ValidationError("Login already registered")
+        identity = self._users.add_identity(
+            CreateIdentityInput(
+                user_id=user_id,
+                identity_type="email",
+                identifier=normalized_login,
+                secret_hash=password_hash,
+                is_verified=False,
+            )
         )
+        self._session.commit()
+        return identity
+
+    def register_telegram_identity(self, user_id: UUID, telegram_id: int) -> UserIdentityView:
+        identifier = f"telegram:{telegram_id}"
+        existing = self._users.get_identity("telegram", identifier)
+        if existing:
+            return existing
+        identity = self._users.add_identity(
+            CreateIdentityInput(
+                user_id=user_id,
+                identity_type="telegram",
+                identifier=identifier,
+                secret_hash=None,
+                is_verified=True,
+            )
+        )
+        self._session.commit()
+        return identity
+
+    def find_telegram_identity(self, telegram_id: int) -> UserIdentityView | None:
+        return self._users.get_identity("telegram", f"telegram:{telegram_id}")
+
+    def verify_email_identity(self, login: str) -> None:
+        self._users.verify_identity("email", login)
+        self._session.commit()
 
     def get_auth_token(self, payload: AuthInput) -> AuthTokenView:
-        email = payload.email.strip().lower()
-        user = self._users.get_by_email(email)
-        if user is None:
+        identity_type = payload.identity_type.strip().lower()
+        identifier = payload.identifier.strip().lower()
+        identity = self._users.get_identity(identity_type, identifier)
+        if identity is None:
             raise NotFoundError("User not found")
-        if not self.is_password_match(user.password_hash, payload.password_hash):
-            raise ValidationError("Invalid credentials")
-        return AuthTokenView(access_token=str(user.id))
+        if identity_type == "email":
+            if not identity.is_verified:
+                raise ValidationError("Email is not verified")
+            if identity.secret_hash is None:
+                raise ValidationError("Invalid credentials")
+            if not self.is_password_match(identity.secret_hash, payload.password_hash):
+                raise ValidationError("Invalid credentials")
+        return AuthTokenView(access_token=str(identity.user_id))
+
+    def get_email_identity(self, login: str) -> UserIdentityView | None:
+        return self._users.get_identity("email", login)
+
+    def get_identities(self, user_id: UUID) -> list[UserIdentityView]:
+        return self._users.get_identities_by_user(user_id)
 
     def get_profile(self, user_id: UUID) -> UserView:
         user = self._users.get_by_id(user_id)
         if user is None:
             raise NotFoundError("User not found")
-        return UserView(
-            id=user.id,
-            email=user.email,
-            name=user.name,
-            role=user.role,
-            allow_negative_balance=user.allow_negative_balance,
-        )
-
-    def get_profile_by_email(self, email: str) -> UserView:
-        normalized_email = email.strip().lower()
-        user = self._users.get_by_email(normalized_email)
-        if user is None:
-            raise NotFoundError("User not found")
-        return UserView(
-            id=user.id,
-            email=user.email,
-            name=user.name,
-            role=user.role,
-            allow_negative_balance=user.allow_negative_balance,
-        )
+        return self._to_user_view(user)
 
     def update_profile(self, user_id: UUID, payload: UpdateUserInput) -> UserView:
         user = self._users.get_by_id(user_id)
@@ -82,12 +111,14 @@ class UserService:
         updated = replace(user, name=new_name)
         self._users.save(updated)
         self._session.commit()
+        return self._to_user_view(updated)
+
+    def _to_user_view(self, user: User) -> UserView:
         return UserView(
-            id=updated.id,
-            email=updated.email,
-            name=updated.name,
-            role=updated.role,
-            allow_negative_balance=updated.allow_negative_balance,
+            id=user.id,
+            name=user.name,
+            role=user.role,
+            allow_negative_balance=user.allow_negative_balance,
         )
 
     @staticmethod
