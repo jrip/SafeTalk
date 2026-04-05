@@ -5,13 +5,14 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.bootstrap import build_app_container
 from app.core.api_models import ErrorResponse
 from app.db.database import get_db
+from app.modules.users.auth import require_user_id
 
 router = APIRouter(prefix="/history", tags=["history"])
 
@@ -35,9 +36,13 @@ class HistoryResponse(BaseModel):
     "/{user_id}",
     response_model=list[HistoryResponse],
     responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
     },
 )
-def history(user_id: UUID, c=Depends(_container)) -> list[dict[str, Any]]:
+def history(user_id: UUID, c=Depends(_container), current_user_id: UUID = Depends(require_user_id)) -> list[dict[str, Any]]:
+    if current_user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return [asdict(x) for x in c.history.get_api_history(user_id)]

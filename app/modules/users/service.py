@@ -41,7 +41,13 @@ class UserService:
         )
 
     def get_auth_token(self, payload: AuthInput) -> AuthTokenView:
-        raise NotImplementedError("Auth / tokens are out of scope for now")
+        email = payload.email.strip().lower()
+        user = self._users.get_by_email(email)
+        if user is None:
+            raise NotFoundError("User not found")
+        if not self.is_password_match(user.password_hash, payload.password_hash):
+            raise ValidationError("Invalid credentials")
+        return AuthTokenView(access_token=str(user.id))
 
     def get_profile(self, user_id: UUID) -> UserView:
         user = self._users.get_by_id(user_id)

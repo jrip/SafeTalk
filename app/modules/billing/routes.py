@@ -6,13 +6,14 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.bootstrap import build_app_container
 from app.core.api_models import ErrorResponse
 from app.db.database import get_db
+from app.modules.users.auth import require_user_id
 
 router = APIRouter(prefix="/balance", tags=["balance"])
 
@@ -52,11 +53,15 @@ def _as_json(payload: Any) -> dict[str, Any]:
     "/{user_id}",
     response_model=BalanceResponse,
     responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
     },
 )
-def get_balance(user_id: UUID, c=Depends(_container)) -> dict[str, Any]:
+def get_balance(user_id: UUID, c=Depends(_container), current_user_id: UUID = Depends(require_user_id)) -> dict[str, Any]:
+    if current_user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return _as_json(c.billing.get_count_tokens(user_id))
 
 
@@ -65,12 +70,21 @@ def get_balance(user_id: UUID, c=Depends(_container)) -> dict[str, Any]:
     response_model=BalanceResponse,
     status_code=status.HTTP_200_OK,
     responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         400: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
     },
 )
-def topup(user_id: UUID, payload: TopUpRequest, c=Depends(_container)) -> dict[str, Any]:
+def topup(
+    user_id: UUID,
+    payload: TopUpRequest,
+    c=Depends(_container),
+    current_user_id: UUID = Depends(require_user_id),
+) -> dict[str, Any]:
+    if current_user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return _as_json(c.billing.add_tokens(user_id, payload.amount))
 
 
@@ -78,13 +92,22 @@ def topup(user_id: UUID, payload: TopUpRequest, c=Depends(_container)) -> dict[s
     "/{user_id}/spend",
     response_model=BalanceResponse,
     responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         400: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         409: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
     },
 )
-def spend(user_id: UUID, payload: SpendRequest, c=Depends(_container)) -> dict[str, Any]:
+def spend(
+    user_id: UUID,
+    payload: SpendRequest,
+    c=Depends(_container),
+    current_user_id: UUID = Depends(require_user_id),
+) -> dict[str, Any]:
+    if current_user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return _as_json(c.billing.spend_tokens(user_id, payload.amount))
 
 
@@ -92,9 +115,13 @@ def spend(user_id: UUID, payload: SpendRequest, c=Depends(_container)) -> dict[s
     "/{user_id}/ledger",
     response_model=list[BalanceLedgerEntryResponse],
     responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
     },
 )
-def ledger(user_id: UUID, c=Depends(_container)) -> list[dict[str, Any]]:
+def ledger(user_id: UUID, c=Depends(_container), current_user_id: UUID = Depends(require_user_id)) -> list[dict[str, Any]]:
+    if current_user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return [asdict(x) for x in c.billing.get_ledger_history(user_id)]

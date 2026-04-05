@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import FastAPI, Request
+from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette import status
@@ -51,6 +52,21 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "Invalid request payload",
                 {"fields": exc.errors()},
             ),
+        )
+
+    @app.exception_handler(HTTPException)
+    async def handle_http_exception(_: Request, exc: HTTPException) -> JSONResponse:
+        error_code = "http_error"
+        if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+            error_code = "unauthorized"
+        elif exc.status_code == status.HTTP_403_FORBIDDEN:
+            error_code = "forbidden"
+        elif exc.status_code == status.HTTP_404_NOT_FOUND:
+            error_code = "not_found"
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=_error_payload(error_code, str(exc.detail)),
+            headers=exc.headers,
         )
 
     @app.exception_handler(DomainError)
