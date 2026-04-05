@@ -14,11 +14,8 @@ from app.core import ValidationError
 from app.core.api_models import ErrorResponse
 from app.db.database import get_db
 from app.modules.users.auth import (
-    get_email_verification_status,
     issue_access_token,
-    issue_email_verification,
     require_user_id,
-    verify_email_code,
 )
 from app.modules.users.types import AuthInput, CreateUserInput, UpdateUserInput
 
@@ -93,7 +90,7 @@ def register(payload: RegisterRequest, c=Depends(_container)) -> dict[str, Any]:
         )
     )
     c.users.register_email_identity(user.id, payload.login, payload.password)
-    verification_code = issue_email_verification(user.id, payload.login)
+    verification_code = c.users.start_email_verification(payload.login)
     log.info(
         "registration mock email sent to login=%s; pending verification code=%s (future: real email provider)",
         payload.login,
@@ -115,19 +112,7 @@ def register(payload: RegisterRequest, c=Depends(_container)) -> dict[str, Any]:
     },
 )
 def verify_email(payload: VerifyEmailRequest, c=Depends(_container)) -> dict[str, Any]:
-    identity = c.users.get_email_identity(payload.login)
-    if identity is None:
-        raise ValidationError("User not found")
-    verified_user_id = verify_email_code(payload.login, payload.code)
-    if verified_user_id is None or verified_user_id != identity.user_id:
-        status_info = get_email_verification_status(payload.login)
-        if status_info["attempts_left"] <= 0 or status_info["expires_in_seconds"] <= 0:
-            raise ValidationError("Verification code expired or attempts exceeded. Please register again.")
-        raise ValidationError(
-            f"Invalid verification code. Attempts left: {status_info['attempts_left']}, "
-            f"expires in: {status_info['expires_in_seconds']}s"
-        )
-    c.users.verify_email_identity(payload.login)
+    c.users.verify_email_code(payload.login, payload.code)
     return {"status": "verified", "attempts_left": 0, "expires_in_seconds": 0}
 
 

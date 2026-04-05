@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime, timedelta, timezone
+import hashlib
+import secrets
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
 from app.core import NotFoundError, ValidationError
+from app.core.settings import get_settings
 from app.modules.billing.storage_sqlalchemy import SqlAlchemyBalanceStore
 from app.modules.users.entities import User
 from app.modules.users.storage_sqlalchemy import SqlAlchemyUserStore
@@ -73,6 +77,56 @@ class UserService:
         return self._users.get_identity("telegram", f"telegram:{telegram_id}")
 
     def verify_email_identity(self, login: str) -> None:
+        self._users.verify_identity("email", login)
+        self._session.commit()
+
+    def start_email_verification(self, login: str) -> str:
+        identity = self.get_email_identity(login)
+        if identity is None:
+            raise NotFoundError("User not found")
+        settings = get_settings()
+        code = secrets.token_hex(3).upper()
+        code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=settings.email_verification_ttl_seconds)
+        self._users.set_identity_verification(
+            "email",
+            login,
+            code_hash=code_hash,
+            expires_at=expires_at,
+            attempts_left=settings.email_verification_max_attempts,
+        )
+        self._session.commit()
+        return code
+
+    def verify_email_code(self, login: str, code: str) -> None:
+        identity = self.get_email_identity(login)
+        if identity is None:
+            raise NotFoundError("User not found")
+
+        if identity.verification_code_hash is None or identity.verification_expires_at is None:
+            raise ValidationError("No active verification request. Please register again.")
+
+        now = datetime.now(timezone.utc)
+        expires_at = identity.verification_expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+        if now > expires_at:
+            self._users.clear_identity_verification("email", login)
+            self._session.commit()
+            raise ValidationError("Verification code expired. Please register again.")
+
+        submitted_hash = hashlib.sha256(code.strip().upper().encode("utf-8")).hexdigest()
+        if submitted_hash != identity.verification_code_hash:
+            attempts_left = self._users.decrement_identity_attempt("email", login)
+            if attempts_left <= 0:
+                self._users.clear_identity_verification("email", login)
+                self._session.commit()
+                raise ValidationError("Verification attempts exceeded. Please register again.")
+            self._session.commit()
+            expires_in = max(0, int((expires_at - now).total_seconds()))
+            raise ValidationError(f"Invalid verification code. Attempts left: {attempts_left}, expires in: {expires_in}s")
+
         self._users.verify_identity("email", login)
         self._session.commit()
 

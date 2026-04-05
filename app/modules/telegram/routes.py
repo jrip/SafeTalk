@@ -13,7 +13,7 @@ from app.bootstrap import build_app_container
 from app.core import NotFoundError, ValidationError
 from app.core.api_models import ErrorResponse
 from app.db.database import get_db
-from app.modules.users.auth import issue_access_token, issue_email_verification
+from app.modules.users.auth import issue_access_token
 from app.modules.users.types import CreateUserInput
 
 router = APIRouter(prefix="/telegram", tags=["telegram"])
@@ -126,7 +126,7 @@ def bind_email(payload: TelegramBindEmailRequest, c=Depends(_container)) -> dict
     elif existing_email_identity.user_id != user.id:
         raise ValidationError("Email already linked to another user")
 
-    verification_code = issue_email_verification(user.id, payload.login)
+    verification_code = c.users.start_email_verification(payload.login)
     log.info(
         "telegram email verification sent to login=%s; code=%s (future: real email provider)",
         payload.login,

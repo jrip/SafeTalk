@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -36,6 +37,9 @@ def _identity_view_from_model(row: UserIdentityModel) -> UserIdentityView:
         identifier=row.identifier,
         is_verified=row.is_verified,
         secret_hash=row.secret_hash,
+        verification_code_hash=row.verification_code_hash,
+        verification_expires_at=row.verification_expires_at,
+        verification_attempts_left=row.verification_attempts_left,
     )
 
 
@@ -90,7 +94,57 @@ class SqlAlchemyUserStore:
         if row is None:
             raise NotFoundError("Identity not found")
         row.is_verified = True
+        row.verification_code_hash = None
+        row.verification_expires_at = None
+        row.verification_attempts_left = None
 
     def get_identities_by_user(self, user_id: UUID) -> list[UserIdentityView]:
         rows = self._session.scalars(select(UserIdentityModel).where(UserIdentityModel.user_id == user_id)).all()
         return [_identity_view_from_model(row) for row in rows]
+
+    def set_identity_verification(
+        self,
+        identity_type: str,
+        identifier: str,
+        code_hash: str,
+        expires_at: datetime,
+        attempts_left: int,
+    ) -> None:
+        row = self._session.scalar(
+            select(UserIdentityModel).where(
+                UserIdentityModel.identity_type == identity_type,
+                UserIdentityModel.identifier == identifier.strip().lower(),
+            )
+        )
+        if row is None:
+            raise NotFoundError("Identity not found")
+        row.verification_code_hash = code_hash
+        row.verification_expires_at = expires_at
+        row.verification_attempts_left = attempts_left
+
+    def clear_identity_verification(self, identity_type: str, identifier: str) -> None:
+        row = self._session.scalar(
+            select(UserIdentityModel).where(
+                UserIdentityModel.identity_type == identity_type,
+                UserIdentityModel.identifier == identifier.strip().lower(),
+            )
+        )
+        if row is None:
+            raise NotFoundError("Identity not found")
+        row.verification_code_hash = None
+        row.verification_expires_at = None
+        row.verification_attempts_left = None
+
+    def decrement_identity_attempt(self, identity_type: str, identifier: str) -> int:
+        row = self._session.scalar(
+            select(UserIdentityModel).where(
+                UserIdentityModel.identity_type == identity_type,
+                UserIdentityModel.identifier == identifier.strip().lower(),
+            )
+        )
+        if row is None:
+            raise NotFoundError("Identity not found")
+        current = row.verification_attempts_left or 0
+        next_value = max(0, current - 1)
+        row.verification_attempts_left = next_value
+        return next_value

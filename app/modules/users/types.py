@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 
@@ -42,6 +43,9 @@ class UserIdentityView:
     identifier: str
     is_verified: bool
     secret_hash: str | None = None
+    verification_code_hash: str | None = None
+    verification_expires_at: datetime | None = None
+    verification_attempts_left: int | None = None
 
 
 @dataclass(frozen=True)
