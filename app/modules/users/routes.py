@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.bootstrap import build_app_container
+from app.core.api_models import ErrorResponse
 from app.db.database import get_db
 from app.modules.users.types import AuthInput, CreateUserInput, UpdateUserInput
 
@@ -31,6 +32,18 @@ class UpdateMeRequest(BaseModel):
     name: str = Field(min_length=1)
 
 
+class UserResponse(BaseModel):
+    id: UUID
+    email: str
+    name: str
+    role: str
+    allow_negative_balance: bool
+
+
+class AuthTokenResponse(BaseModel):
+    access_token: str
+
+
 def _container(session: Session = Depends(get_db)):
     return build_app_container(session)
 
@@ -39,7 +52,15 @@ def _as_json(payload: Any) -> dict[str, Any]:
     return asdict(payload)
 
 
-@router.post("/register")
+@router.post(
+    "/register",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
 def register(payload: RegisterRequest, c=Depends(_container)) -> dict[str, Any]:
     user = c.users.register(
         CreateUserInput(
@@ -51,7 +72,15 @@ def register(payload: RegisterRequest, c=Depends(_container)) -> dict[str, Any]:
     return _as_json(user)
 
 
-@router.post("/login")
+@router.post(
+    "/login",
+    response_model=AuthTokenResponse,
+    responses={
+        501: {"model": ErrorResponse},
+        400: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
 def login(payload: LoginRequest, c=Depends(_container)) -> dict[str, Any]:
     try:
         token = c.users.get_auth_token(AuthInput(email=payload.email, password_hash=payload.password))
@@ -60,12 +89,27 @@ def login(payload: LoginRequest, c=Depends(_container)) -> dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=str(e)) from e
 
 
-@users_router.get("/{user_id}")
+@users_router.get(
+    "/{user_id}",
+    response_model=UserResponse,
+    responses={
+        404: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
 def get_user(user_id: UUID, c=Depends(_container)) -> dict[str, Any]:
     return _as_json(c.users.get_profile(user_id))
 
 
-@users_router.patch("/{user_id}")
+@users_router.patch(
+    "/{user_id}",
+    response_model=UserResponse,
+    responses={
+        404: {"model": ErrorResponse},
+        400: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
 def update_user(user_id: UUID, payload: UpdateMeRequest, c=Depends(_container)) -> dict[str, Any]:
     updated = c.users.update_profile(user_id, UpdateUserInput(name=payload.name))
     return _as_json(updated)

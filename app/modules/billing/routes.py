@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.bootstrap import build_app_container
+from app.core.api_models import ErrorResponse
 from app.db.database import get_db
 
 router = APIRouter(prefix="/balance", tags=["balance"])
@@ -23,6 +25,21 @@ class SpendRequest(BaseModel):
     amount: Decimal = Field(gt=0)
 
 
+class BalanceResponse(BaseModel):
+    user_id: UUID
+    token_count: Decimal
+
+
+class BalanceLedgerEntryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    user_id: UUID
+    kind: str
+    amount: Decimal
+    task_id: UUID | None
+    created_at: datetime
+
+
 def _container(session: Session = Depends(get_db)):
     return build_app_container(session)
 
@@ -31,21 +48,53 @@ def _as_json(payload: Any) -> dict[str, Any]:
     return asdict(payload)
 
 
-@router.get("/{user_id}")
+@router.get(
+    "/{user_id}",
+    response_model=BalanceResponse,
+    responses={
+        404: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
 def get_balance(user_id: UUID, c=Depends(_container)) -> dict[str, Any]:
     return _as_json(c.billing.get_count_tokens(user_id))
 
 
-@router.post("/{user_id}/topup")
+@router.post(
+    "/{user_id}/topup",
+    response_model=BalanceResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
 def topup(user_id: UUID, payload: TopUpRequest, c=Depends(_container)) -> dict[str, Any]:
     return _as_json(c.billing.add_tokens(user_id, payload.amount))
 
 
-@router.post("/{user_id}/spend")
+@router.post(
+    "/{user_id}/spend",
+    response_model=BalanceResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
 def spend(user_id: UUID, payload: SpendRequest, c=Depends(_container)) -> dict[str, Any]:
     return _as_json(c.billing.spend_tokens(user_id, payload.amount))
 
 
-@router.get("/{user_id}/ledger")
+@router.get(
+    "/{user_id}/ledger",
+    response_model=list[BalanceLedgerEntryResponse],
+    responses={
+        404: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
 def ledger(user_id: UUID, c=Depends(_container)) -> list[dict[str, Any]]:
     return [asdict(x) for x in c.billing.get_ledger_history(user_id)]
