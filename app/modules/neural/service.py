@@ -82,6 +82,12 @@ class NeuralService:
             charged_tokens=charge,
         )
 
+    def get_default_model_id(self) -> UUID:
+        meta = self._ml_models.get_default_model_meta()
+        if meta is None:
+            raise NotFoundError("No active ML model configured")
+        return meta.id
+
     def get_toxicity(self, payload: RunPredictionInput) -> PredictionView:
         raise NotImplementedError("Neural processing is mocked at this stage")
 

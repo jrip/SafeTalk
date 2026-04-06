@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.modules.neural.entities import MLTask
@@ -16,6 +17,20 @@ class SqlAlchemyMlModelCatalog:
 
     def get_model_meta(self, model_id: UUID) -> MlModelMeta | None:
         row = self._session.get(MlModelModel, model_id)
+        if row is None:
+            return None
+        return MlModelMeta(
+            id=row.id,
+            price_per_character=row.price_per_character,
+            is_active=row.is_active,
+        )
+
+    def get_default_model_meta(self) -> MlModelMeta | None:
+        row = self._session.scalar(
+            select(MlModelModel).where(MlModelModel.is_default.is_(True), MlModelModel.is_active.is_(True))
+        )
+        if row is None:
+            row = self._session.scalar(select(MlModelModel).where(MlModelModel.is_active.is_(True)))
         if row is None:
             return None
         return MlModelMeta(

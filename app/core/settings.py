@@ -38,6 +38,8 @@ class AppSettings(Settings):
     RABBITMQ_PORT: Optional[int] = None
     RABBITMQ_USER: Optional[str] = None
     RABBITMQ_PASS: Optional[str] = None
+    TELEGRAM_BOT_TOKEN: Optional[str] = None
+    TELEGRAM_WEBHOOK_SECRET_TOKEN: Optional[str] = None
     email_verification_ttl_seconds: int = 3600
     email_verification_max_attempts: int = 10
 

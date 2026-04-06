@@ -51,7 +51,7 @@ docker compose up -d --build
 - `app/modules/billing` - баланс, пополнение, списание, журнал транзакций
 - `app/modules/neural` - запуск ML-предикта, расчет стоимости, создание ML-задач
 - `app/modules/history` - история запросов и операций пользователя
-- `app/modules/telegram` - отдельный API-слой для Telegram-сценариев (регистрация/вход бота)
+- `app/modules/telegram` - webhook-обработчик Telegram-бота (бот-логика в этом же сервисе)
 - `app/modules/system` - технические health-check эндпоинты
 
 ### Базовые принципы
@@ -91,9 +91,7 @@ docker compose up -d --build
 | `GET` | `/health` | Liveness probe приложения | No | Проверка, что процесс жив |
 | `GET` | `/health/db` | Readiness probe БД | No | Проверка соединения с БД |
 | `POST` | `/auth/register` | Регистрация пользователя | No | Создает пользователя и кошелек |
-| `POST` | `/telegram/register` | Старт Telegram-онбординга | No | Принимает `telegram_id`, создает/находит пользователя, возвращает `status` (`need_email`/`ready`) без токена |
-| `POST` | `/telegram/bind-email` | Привязка email к Telegram-пользователю | No | Создает/проверяет email-identity и отправляет mock-код верификации |
-| `POST` | `/telegram/complete` | Завершение входа из Telegram | No | Выдает `access_token` только если email уже подтвержден |
+| `POST` | `/telegram/webhook` | Webhook Telegram-бота | Telegram Secret Token | Получает update от Telegram и обрабатывает команды внутри сервиса |
 | `POST` | `/auth/verify-email` | Подтверждение email | No | Проверяет код подтверждения из mock-письма (в логах) |
 | `POST` | `/auth/login` | Логин пользователя | No | Возвращает `access_token`; вход только после verify-email |
 | `GET` | `/users/{user_id}` | Профиль пользователя | Bearer | Доступ только к своему `user_id` |
@@ -110,4 +108,9 @@ docker compose up -d --build
 Параметры верификации email настраиваются через env:
 - `EMAIL_VERIFICATION_TTL_SECONDS` (по умолчанию `3600`)
 - `EMAIL_VERIFICATION_MAX_ATTEMPTS` (по умолчанию `10`)
+
+Для Telegram webhook нужны env-параметры:
+- `TELEGRAM_BOT_TOKEN` - токен бота для вызова Telegram Bot API (`sendMessage`)
+- `TELEGRAM_WEBHOOK_SECRET_TOKEN` - секрет, который Telegram шлет в `X-Telegram-Bot-Api-Secret-Token`
+- без корректного webhook secret -> `401`, если secret не настроен -> `503`
 

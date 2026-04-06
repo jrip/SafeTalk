@@ -90,11 +90,10 @@ def register(payload: RegisterRequest, c=Depends(_container)) -> dict[str, Any]:
         )
     )
     c.users.register_email_identity(user.id, payload.login, payload.password)
-    verification_code = c.users.start_email_verification(payload.login)
+    c.users.start_email_verification(payload.login)
     log.info(
-        "registration mock email sent to login=%s; pending verification code=%s (future: real email provider)",
+        "registration verification initiated for login=%s (future: real email provider)",
         payload.login,
-        verification_code,
     )
     identities = c.users.get_identities(user.id)
     data = _as_json(user)
