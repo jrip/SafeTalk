@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from uuid import UUID
@@ -64,7 +65,7 @@ class BatchTaskResultView:
 
 @dataclass(frozen=True)
 class CreatePredictionTaskView:
-    """Результат постановки ML-задачи (инференс — отдельно, по очереди)."""
+    """Результат ML-задачи после синхронного мок-инференса."""
 
     task_id: UUID
     user_id: UUID
@@ -72,3 +73,16 @@ class CreatePredictionTaskView:
     text: str
     status: TaskStatus
     charged_tokens: Decimal
+    result_summary: str | None = None
+
+
+@dataclass(frozen=True)
+class MlTaskDetailView:
+    task_id: UUID
+    user_id: UUID
+    model_id: UUID
+    text: str
+    status: TaskStatus
+    charged_tokens: Decimal
+    created_at: datetime
+    result_summary: str | None

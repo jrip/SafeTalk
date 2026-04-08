@@ -5,9 +5,9 @@ import secrets
 from typing import Any
 from uuid import UUID
 
-from app.core import NotFoundError, ValidationError
+from app.core import InsufficientBalanceError, NotFoundError, ValidationError
 from app.core.settings import get_settings
-from app.modules.neural.types import RunPredictionInput
+from app.modules.neural.types import RunPredictionInput, TaskStatus
 from app.modules.telegram.client import TelegramApiClient
 from app.modules.users.types import CreateUserInput
 
@@ -169,13 +169,18 @@ def handle_telegram_update(update: dict[str, Any], c: Any) -> None:
                     text=payload_text,
                 )
             )
+            status_line = (
+                task.status.value if isinstance(task.status, TaskStatus) else str(task.status)
+            )
+            result_line = task.result_summary or "—"
             bot.send_message(
                 chat_id,
-                f"ML задача создана: {task.task_id}\n"
+                f"ML задача: {task.task_id}\n"
                 f"Списано токенов: {task.charged_tokens}\n"
-                f"Статус: {task.status}",
+                f"Статус: {status_line}\n"
+                f"Результат: {result_line}",
             )
-        except (ValidationError, NotFoundError) as exc:
+        except (ValidationError, NotFoundError, InsufficientBalanceError) as exc:
             bot.send_message(chat_id, str(exc))
         return
 

@@ -8,8 +8,8 @@ from uuid import UUID, uuid4
 class User:
     """Plain data model for Users domain."""
 
-    password_hash: str = "identity-managed"
     name: str
+    password_hash: str = "identity-managed"
     role: str = "user"
     allow_negative_balance: bool = False
     id: UUID = field(default_factory=uuid4)

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.neural.entities import MLTask
 from app.modules.neural.models import MlModelModel, MlPredictionTaskModel
-from app.modules.neural.types import MlModelMeta
+from app.modules.neural.types import MlModelMeta, TaskStatus
 
 
 class SqlAlchemyMlModelCatalog:
@@ -55,4 +55,12 @@ class SqlAlchemyMlTaskStore:
                 charged_tokens=charged_tokens,
             )
         )
+        self._session.flush()
+
+    def complete_task(self, task_id: UUID, result_summary: str) -> None:
+        row = self._session.get(MlPredictionTaskModel, task_id)
+        if row is None:
+            return
+        row.status = TaskStatus.COMPLETED.value
+        row.result_summary = result_summary
         self._session.flush()

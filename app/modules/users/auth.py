@@ -20,13 +20,6 @@ def resolve_access_token(token: str) -> UUID | None:
     return _token_to_user.get(token)
 
 
-def is_user_email_verified(user_id: UUID) -> bool:
-    # Users not present in pending map are considered verified by default.
-    if user_id in _verified_users:
-        return True
-    return all(pending_user_id != user_id for pending_user_id, _ in _pending_email_verifications.values())
-
-
 def require_user_id(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> UUID:

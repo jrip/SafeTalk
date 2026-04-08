@@ -17,6 +17,18 @@ class HistoryService:
     def get_api_history(self, user_id: UUID) -> list[HistoryView]:
         return self._history.list_for_user(user_id)
 
+    def update_result_for_ml_task(
+        self,
+        user_id: UUID,
+        ml_task_id: UUID,
+        result: str,
+        *,
+        commit: bool = True,
+    ) -> None:
+        self._history.update_result_for_ml_task(user_id, ml_task_id, result)
+        if commit:
+            self._session.commit()
+
     def save_api_request(
         self,
         user_id: UUID,

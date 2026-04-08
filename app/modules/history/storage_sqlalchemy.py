@@ -58,6 +58,20 @@ class SqlAlchemyHistoryStore:
         )
         self._session.flush()
 
+    def update_result_for_ml_task(self, user_id: UUID, ml_task_id: UUID, result: str) -> None:
+        row = self._session.scalar(
+            select(HistoryRecordModel)
+            .where(
+                HistoryRecordModel.user_id == user_id,
+                HistoryRecordModel.ml_task_id == ml_task_id,
+            )
+            .order_by(HistoryRecordModel.created_at.desc())
+            .limit(1)
+        )
+        if row is not None:
+            row.result = result
+            self._session.flush()
+
     def get_own_record(self, user_id: UUID, record_id: UUID) -> HistoryRecord | None:
         row = self._session.get(HistoryRecordModel, record_id)
         if row is None or row.user_id != user_id:
