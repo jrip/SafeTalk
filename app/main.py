@@ -7,6 +7,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -179,3 +180,9 @@ app.include_router(users_router)
 app.include_router(balance_router)
 app.include_router(predict_router)
 app.include_router(history_router)
+
+
+@app.get("/", include_in_schema=False)
+def root_redirect() -> RedirectResponse:
+    """С корня — в Swagger (и при прямом заходе на :27491 без nginx)."""
+    return RedirectResponse(url="/docs", status_code=302)
