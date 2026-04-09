@@ -6,13 +6,13 @@ import hashlib
 import secrets
 from uuid import UUID
 
+import bcrypt
 from sqlalchemy.orm import Session
 
 from app.core import NotFoundError, ValidationError
 from app.core.settings import get_settings
 from app.modules.billing.storage_sqlalchemy import SqlAlchemyBalanceStore
 from app.modules.users.entities import User
-from app.modules.users.passwords import hash_password, verify_password
 from app.modules.users.storage_sqlalchemy import SqlAlchemyUserStore
 from app.modules.users.types import (
     AuthInput,
@@ -23,6 +23,22 @@ from app.modules.users.types import (
     UserIdentityView,
     UserView,
 )
+
+
+def hash_password(plain: str) -> str:
+    """Bcrypt для поля secret_hash в БД."""
+    return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")
+
+
+def verify_password(plain: str, stored: str | None) -> bool:
+    if not plain or stored is None:
+        return False
+    if stored.startswith(("$2a$", "$2b$", "$2y$")):
+        try:
+            return bcrypt.checkpw(plain.encode("utf-8"), stored.encode("utf-8"))
+        except ValueError:
+            return False
+    return plain == stored
 
 
 class UserService:

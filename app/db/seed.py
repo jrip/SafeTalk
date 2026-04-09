@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.types import now_utc
 from app.modules.billing.models import BalanceLedgerEntryModel, UserBalanceModel
-from app.modules.users.passwords import hash_password
+from app.modules.users.service import hash_password
 from app.modules.feedback.models import FeedbackModel
 from app.modules.history.models import HistoryRecordModel
 from app.modules.neural.models import MlModelModel, MlPredictionTaskModel
