@@ -52,6 +52,14 @@ class UserResponse(BaseModel):
     identities: list[str]
 
 
+class RegisterResponse(UserResponse):
+    """Ответ регистрации; поле с кодом — только для тестов, убрать перед продом."""
+
+    temporary_only_for_test_todo: str = Field(
+        description="Код подтверждения email (временно для тестов без почтового сервиса).",
+    )
+
+
 class AuthTokenResponse(BaseModel):
     access_token: str
 
@@ -72,7 +80,7 @@ def _as_json(payload: Any) -> dict[str, Any]:
 
 @router.post(
     "/register",
-    response_model=UserResponse,
+    response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
     responses={
         400: {"model": ErrorResponse},
@@ -90,7 +98,7 @@ def register(payload: RegisterRequest, c=Depends(_container)) -> dict[str, Any]:
         )
     )
     c.users.register_email_identity(user.id, payload.login, payload.password)
-    c.users.start_email_verification(payload.login)
+    verification_code = c.users.start_email_verification(payload.login)
     log.info(
         "registration verification initiated for login=%s (future: real email provider)",
         payload.login,
@@ -98,6 +106,7 @@ def register(payload: RegisterRequest, c=Depends(_container)) -> dict[str, Any]:
     identities = c.users.get_identities(user.id)
     data = _as_json(user)
     data["identities"] = [f"{i.identity_type}:{i.identifier}" for i in identities]
+    data["temporary_only_for_test_todo"] = verification_code
     return data
 
 
