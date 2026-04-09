@@ -83,6 +83,21 @@ def _as_json(payload: Any) -> dict[str, Any]:
     return asdict(payload)
 
 
+def _user_response_dict(c: Any, user_id: UUID) -> dict[str, Any]:
+    user = c.users.get_profile(user_id)
+    identities = c.users.get_identities(user_id)
+    data = _as_json(user)
+    data["identities"] = [f"{i.identity_type}:{i.identifier}" for i in identities]
+    return data
+
+
+def _can_access_user_profile(c: Any, current_user_id: UUID, target_user_id: UUID) -> bool:
+    if current_user_id == target_user_id:
+        return True
+    actor = c.users.get_profile(current_user_id)
+    return actor.role == "admin"
+
+
 # TODO(TODO): вместе с RegisterResponse — убрать; см. блок TODO у класса RegisterResponse
 @router.post(
     "/register",
@@ -150,6 +165,42 @@ def login(payload: LoginRequest, c=Depends(_container)) -> dict[str, Any]:
 
 
 @users_router.get(
+    "/me",
+    response_model=UserResponse,
+    responses={
+        401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
+def get_me(c=Depends(_container), current_user_id: UUID = Depends(require_user_id)) -> dict[str, Any]:
+    return _user_response_dict(c, current_user_id)
+
+
+@users_router.patch(
+    "/me",
+    response_model=UserResponse,
+    responses={
+        401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        400: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
+def update_me(
+    payload: UpdateMeRequest,
+    c=Depends(_container),
+    current_user_id: UUID = Depends(require_user_id),
+) -> dict[str, Any]:
+    updated = c.users.update_profile(current_user_id, UpdateUserInput(name=payload.name))
+    data = _as_json(updated)
+    data["identities"] = [
+        f"{i.identity_type}:{i.identifier}" for i in c.users.get_identities(current_user_id)
+    ]
+    return data
+
+
+@users_router.get(
     "/{user_id}",
     response_model=UserResponse,
     responses={
@@ -160,13 +211,9 @@ def login(payload: LoginRequest, c=Depends(_container)) -> dict[str, Any]:
     },
 )
 def get_user(user_id: UUID, c=Depends(_container), current_user_id: UUID = Depends(require_user_id)) -> dict[str, Any]:
-    if current_user_id != user_id:
+    if not _can_access_user_profile(c, current_user_id, user_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-    user = c.users.get_profile(user_id)
-    identities = c.users.get_identities(user_id)
-    data = _as_json(user)
-    data["identities"] = [f"{i.identity_type}:{i.identifier}" for i in identities]
-    return data
+    return _user_response_dict(c, user_id)
 
 
 @users_router.patch(
@@ -186,10 +233,9 @@ def update_user(
     c=Depends(_container),
     current_user_id: UUID = Depends(require_user_id),
 ) -> dict[str, Any]:
-    if current_user_id != user_id:
+    if not _can_access_user_profile(c, current_user_id, user_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     updated = c.users.update_profile(user_id, UpdateUserInput(name=payload.name))
-    identities = c.users.get_identities(user_id)
     data = _as_json(updated)
-    data["identities"] = [f"{i.identity_type}:{i.identifier}" for i in identities]
+    data["identities"] = [f"{i.identity_type}:{i.identifier}" for i in c.users.get_identities(user_id)]
     return data

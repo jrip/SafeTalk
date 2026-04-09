@@ -55,6 +55,37 @@ def _require_admin(c: Any, current_user_id: UUID) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
 
 
+def _can_access_balance(c: Any, current_user_id: UUID, target_user_id: UUID) -> bool:
+    if current_user_id == target_user_id:
+        return True
+    return c.users.get_profile(current_user_id).role == "admin"
+
+
+@router.get(
+    "/me",
+    response_model=BalanceResponse,
+    responses={
+        401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
+def get_my_balance(c=Depends(_container), current_user_id: UUID = Depends(require_user_id)) -> dict[str, Any]:
+    return _as_json(c.billing.get_count_tokens(current_user_id))
+
+
+@router.get(
+    "/me/ledger",
+    response_model=list[BalanceLedgerEntryResponse],
+    responses={
+        401: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
+def get_my_ledger(c=Depends(_container), current_user_id: UUID = Depends(require_user_id)) -> list[dict[str, Any]]:
+    return [asdict(x) for x in c.billing.get_ledger_history(current_user_id)]
+
+
 @router.get(
     "/{user_id}",
     response_model=BalanceResponse,
@@ -66,7 +97,7 @@ def _require_admin(c: Any, current_user_id: UUID) -> None:
     },
 )
 def get_balance(user_id: UUID, c=Depends(_container), current_user_id: UUID = Depends(require_user_id)) -> dict[str, Any]:
-    if current_user_id != user_id:
+    if not _can_access_balance(c, current_user_id, user_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return _as_json(c.billing.get_count_tokens(user_id))
 
@@ -126,6 +157,6 @@ def spend(
     },
 )
 def ledger(user_id: UUID, c=Depends(_container), current_user_id: UUID = Depends(require_user_id)) -> list[dict[str, Any]]:
-    if current_user_id != user_id:
+    if not _can_access_balance(c, current_user_id, user_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return [asdict(x) for x in c.billing.get_ledger_history(user_id)]
