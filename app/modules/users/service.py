@@ -12,6 +12,7 @@ from app.core import NotFoundError, ValidationError
 from app.core.settings import get_settings
 from app.modules.billing.storage_sqlalchemy import SqlAlchemyBalanceStore
 from app.modules.users.entities import User
+from app.modules.users.passwords import hash_password, verify_password
 from app.modules.users.storage_sqlalchemy import SqlAlchemyUserStore
 from app.modules.users.types import (
     AuthInput,
@@ -40,7 +41,7 @@ class UserService:
         self._balance.ensure_wallet(user.id)
         return self._to_user_view(user)
 
-    def register_email_identity(self, user_id: UUID, login: str, password_hash: str) -> UserIdentityView:
+    def register_email_identity(self, user_id: UUID, login: str, password: str) -> UserIdentityView:
         normalized_login = login.strip().lower()
         if self._users.get_identity("email", normalized_login):
             raise ValidationError("Login already registered")
@@ -49,7 +50,7 @@ class UserService:
                 user_id=user_id,
                 identity_type="email",
                 identifier=normalized_login,
-                secret_hash=password_hash,
+                secret_hash=hash_password(password),
                 is_verified=False,
             )
         )
@@ -141,7 +142,7 @@ class UserService:
                 raise ValidationError("Email is not verified")
             if identity.secret_hash is None:
                 raise ValidationError("Invalid credentials")
-            if not self.is_password_match(identity.secret_hash, payload.password_hash):
+            if not verify_password(payload.password_hash, identity.secret_hash):
                 raise ValidationError("Invalid credentials")
         return AuthTokenView(access_token=str(identity.user_id))
 
@@ -182,6 +183,3 @@ class UserService:
             raise ValidationError("User name cannot be empty")
         return normalized
 
-    @staticmethod
-    def is_password_match(stored_hash: str, incoming_hash: str) -> bool:
-        return stored_hash == incoming_hash

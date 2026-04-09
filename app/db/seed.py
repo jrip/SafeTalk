@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.types import now_utc
 from app.modules.billing.models import BalanceLedgerEntryModel, UserBalanceModel
+from app.modules.users.passwords import hash_password
 from app.modules.feedback.models import FeedbackModel
 from app.modules.history.models import HistoryRecordModel
 from app.modules.neural.models import MlModelModel, MlPredictionTaskModel
@@ -43,6 +44,8 @@ _DEMO_USER_ID = UUID("10000000-0000-4000-8000-000000000001")
 _DEMO_ADMIN_ID = UUID("10000000-0000-4000-8000-000000000002")
 _DEMO_USER_LOGIN = "demo@safetalk.local"
 _DEMO_ADMIN_LOGIN = "admin@safetalk.local"
+# Один пароль для демо-юзера и админа (bcrypt в БД; логины см. выше).
+_DEMO_SEED_PASSWORD = "DemoPass123"
 
 _DEMO_TASK_ID = UUID("20000000-0000-4000-8000-000000000001")
 _DEMO_HISTORY_ID = UUID("20000000-0000-4000-8000-000000000002")
@@ -63,6 +66,11 @@ def _seed_ml_models(session: Session) -> None:
 
 
 def _seed_demo_users(session: Session) -> None:
+    """Демо-аккаунты для Swagger / проверок.
+
+    demo@safetalk.local / DemoPass123 — обычный пользователь.
+    admin@safetalk.local / DemoPass123 — админ (topup, просмотр чужих профилей при необходимости).
+    """
     demos: tuple[dict, ...] = (
         {
             "id": _DEMO_USER_ID,
@@ -101,7 +109,7 @@ def _seed_demo_users(session: Session) -> None:
                 user_id=d["id"],
                 identity_type="email",
                 identifier=d["login"],
-                secret_hash="seed-not-for-production",
+                secret_hash=hash_password(_DEMO_SEED_PASSWORD),
                 is_verified=True,
             )
         )
