@@ -159,7 +159,18 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="SafeTalk", lifespan=lifespan)
+app = FastAPI(
+    title="SafeTalk",
+    lifespan=lifespan,
+    description=(
+        "Для защищённых ручек нажми **Authorize** (замок вверху страницы /docs), "
+        "вставь только токен из `POST /auth/login` без префикса `Bearer`."
+    ),
+    swagger_ui_parameters={
+        "persistAuthorization": True,
+        "tryItOutEnabled": True,
+    },
+)
 register_exception_handlers(app)
 app.include_router(system_router)
 app.include_router(auth_router)

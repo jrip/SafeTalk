@@ -19,11 +19,23 @@ router = APIRouter(prefix="/balance", tags=["balance"])
 
 
 class TopUpRequest(BaseModel):
-    amount: Decimal = Field(gt=0)
+    """Тело POST /balance/{user_id}/topup — сколько токенов зачислить."""
+
+    amount: Decimal = Field(
+        gt=0,
+        description="Сколько токенов добавить (в Swagger — в блоке Request body, JSON).",
+        json_schema_extra={"example": "1000"},
+    )
 
 
 class SpendRequest(BaseModel):
-    amount: Decimal = Field(gt=0)
+    """Тело POST /balance/{user_id}/spend — сколько токенов списать (только admin)."""
+
+    amount: Decimal = Field(
+        gt=0,
+        description="Сколько токенов списать (Request body, JSON).",
+        json_schema_extra={"example": "10"},
+    )
 
 
 class BalanceResponse(BaseModel):
