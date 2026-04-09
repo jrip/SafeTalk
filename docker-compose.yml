@@ -7,12 +7,6 @@ services:
       dockerfile: app/Dockerfile
     env_file:
       - app/.env
-    # Прямой доступ к FastAPI без nginx. Вебхук: /telegram/webhook
-    # URL: http(s)://<хост>:<APP_DIRECT_PORT>/telegram/webhook
-    # Порт по умолчанию не 80/8080; переопредели в .env рядом с compose: APP_DIRECT_PORT=38217
-    # У Telegram вебхук всё равно должен быть HTTPS (сертификат/ngrok/cloudflare tunnel).
-    ports:
-      - "${APP_DIRECT_PORT:-27491}:8000"
     volumes:
       - ./app:/workspace/app
     depends_on:
@@ -26,9 +20,6 @@ services:
     ports:
       - "${WEB_PROXY_HTTP_PORT:-80}:80"
       - "${WEB_PROXY_HTTPS_PORT:-443}:443"
-    volumes:
-      - ./certbot/www:/var/www/certbot:rw
-      - ./certbot/conf:/etc/letsencrypt:ro
     depends_on:
       - app
 
