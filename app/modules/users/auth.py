@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import secrets
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-_bearer = HTTPBearer(auto_error=False)
+# Security (а не Depends) — чтобы в OpenAPI появилась схема и в Swagger была кнопка Authorize.
+_bearer = HTTPBearer(
+    auto_error=False,
+    description="Токен из ответа POST /auth/login. В поле вставь только сам токен (префикс Bearer Swagger добавит).",
+)
 _token_to_user: dict[str, UUID] = {}
 
 
@@ -21,7 +26,10 @@ def resolve_access_token(token: str) -> UUID | None:
 
 
 def require_user_id(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Security(_bearer),
+    ],
 ) -> UUID:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(
