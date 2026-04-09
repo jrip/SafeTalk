@@ -4,14 +4,13 @@ from sqlalchemy.orm import Session
 
 from app.core import ValidationError
 from app.modules.feedback.entities import Feedback
-from app.modules.feedback.interfaces import FeedbackInternalService
-from app.modules.feedback.ports import FeedbackStore
+from app.modules.feedback.storage_sqlalchemy import SqlAlchemyFeedbackStore
 from app.modules.feedback.types import CreateFeedbackInput, FeedbackView
-from app.modules.history.ports import HistoryStore
+from app.modules.history.storage_sqlalchemy import SqlAlchemyHistoryStore
 
 
-class FeedbackService(FeedbackInternalService):
-    def __init__(self, feedback: FeedbackStore, history: HistoryStore, session: Session) -> None:
+class FeedbackService:
+    def __init__(self, feedback: SqlAlchemyFeedbackStore, history: SqlAlchemyHistoryStore, session: Session) -> None:
         self._feedback = feedback
         self._history = history
         self._session = session

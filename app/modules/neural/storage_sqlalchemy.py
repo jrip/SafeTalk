@@ -3,15 +3,15 @@ from __future__ import annotations
 from decimal import Decimal
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.modules.neural.entities import MLTask
 from app.modules.neural.models import MlModelModel, MlPredictionTaskModel
-from app.modules.neural.ports import MlModelCatalog, MlTaskStore
-from app.modules.neural.types import MlModelMeta
+from app.modules.neural.types import MlModelMeta, TaskStatus
 
 
-class SqlAlchemyMlModelCatalog(MlModelCatalog):
+class SqlAlchemyMlModelCatalog:
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -25,8 +25,22 @@ class SqlAlchemyMlModelCatalog(MlModelCatalog):
             is_active=row.is_active,
         )
 
+    def get_default_model_meta(self) -> MlModelMeta | None:
+        row = self._session.scalar(
+            select(MlModelModel).where(MlModelModel.is_default.is_(True), MlModelModel.is_active.is_(True))
+        )
+        if row is None:
+            row = self._session.scalar(select(MlModelModel).where(MlModelModel.is_active.is_(True)))
+        if row is None:
+            return None
+        return MlModelMeta(
+            id=row.id,
+            price_per_character=row.price_per_character,
+            is_active=row.is_active,
+        )
 
-class SqlAlchemyMlTaskStore(MlTaskStore):
+
+class SqlAlchemyMlTaskStore:
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -41,4 +55,12 @@ class SqlAlchemyMlTaskStore(MlTaskStore):
                 charged_tokens=charged_tokens,
             )
         )
+        self._session.flush()
+
+    def complete_task(self, task_id: UUID, result_summary: str) -> None:
+        row = self._session.get(MlPredictionTaskModel, task_id)
+        if row is None:
+            return
+        row.status = TaskStatus.COMPLETED.value
+        row.result_summary = result_summary
         self._session.flush()

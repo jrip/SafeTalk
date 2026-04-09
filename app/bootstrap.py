@@ -4,30 +4,25 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from app.modules.billing.interfaces import BillingPublicService
 from app.modules.billing.service import BillingService
 from app.modules.billing.storage_sqlalchemy import SqlAlchemyBalanceStore
-from app.modules.feedback.interfaces import FeedbackPublicService
 from app.modules.feedback.service import FeedbackService
 from app.modules.feedback.storage_sqlalchemy import SqlAlchemyFeedbackStore
-from app.modules.history.interfaces import HistoryPublicService
 from app.modules.history.service import HistoryService
 from app.modules.history.storage_sqlalchemy import SqlAlchemyHistoryStore
-from app.modules.neural.interfaces import NeuralPublicService
 from app.modules.neural.service import NeuralService
 from app.modules.neural.storage_sqlalchemy import SqlAlchemyMlModelCatalog, SqlAlchemyMlTaskStore
-from app.modules.users.interfaces import UsersPublicService
 from app.modules.users.service import UserService
 from app.modules.users.storage_sqlalchemy import SqlAlchemyUserStore
 
 
 @dataclass
 class AppContainer:
-    users: UsersPublicService
-    billing: BillingPublicService
-    history: HistoryPublicService
-    neural: NeuralPublicService
-    feedback: FeedbackPublicService
+    users: UserService
+    billing: BillingService
+    history: HistoryService
+    neural: NeuralService
+    feedback: FeedbackService
 
 
 def build_app_container(session: Session) -> AppContainer:

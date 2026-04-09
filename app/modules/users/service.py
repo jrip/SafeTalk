@@ -1,60 +1,178 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime, timedelta, timezone
+import hashlib
+import secrets
 from uuid import UUID
 
+import bcrypt
 from sqlalchemy.orm import Session
 
 from app.core import NotFoundError, ValidationError
-from app.modules.billing.ports import BalanceStore
+from app.core.settings import get_settings
+from app.modules.billing.storage_sqlalchemy import SqlAlchemyBalanceStore
 from app.modules.users.entities import User
-from app.modules.users.interfaces import UsersInternalService
-from app.modules.users.ports import UserStore
-from app.modules.users.types import AuthInput, AuthTokenView, CreateUserInput, UpdateUserInput, UserView
+from app.modules.users.storage_sqlalchemy import SqlAlchemyUserStore
+from app.modules.users.types import (
+    AuthInput,
+    AuthTokenView,
+    CreateIdentityInput,
+    CreateUserInput,
+    UpdateUserInput,
+    UserIdentityView,
+    UserView,
+)
 
 
-class UserService(UsersInternalService):
-    def __init__(self, users: UserStore, balance: BalanceStore, session: Session) -> None:
+def hash_password(plain: str) -> str:
+    """Bcrypt для поля secret_hash в БД."""
+    return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")
+
+
+def verify_password(plain: str, stored: str | None) -> bool:
+    if not plain or stored is None:
+        return False
+    if stored.startswith(("$2a$", "$2b$", "$2y$")):
+        try:
+            return bcrypt.checkpw(plain.encode("utf-8"), stored.encode("utf-8"))
+        except ValueError:
+            return False
+    return plain == stored
+
+
+class UserService:
+    def __init__(self, users: SqlAlchemyUserStore, balance: SqlAlchemyBalanceStore, session: Session) -> None:
         self._users = users
         self._balance = balance
         self._session = session
 
     def register(self, payload: CreateUserInput) -> UserView:
-        email = payload.email.strip().lower()
-        if self._users.get_by_email(email):
-            raise ValidationError("Email already registered")
         name = self.normalize_name(payload.name)
         user = User(
-            email=email,
-            password_hash=payload.password_hash,
             name=name,
             role=payload.role,
         )
         self._users.add(user)
         self._balance.ensure_wallet(user.id)
-        self._session.commit()
-        return UserView(
-            id=user.id,
-            email=user.email,
-            name=user.name,
-            role=user.role,
-            allow_negative_balance=user.allow_negative_balance,
+        return self._to_user_view(user)
+
+    def register_email_identity(self, user_id: UUID, login: str, password: str) -> UserIdentityView:
+        normalized_login = login.strip().lower()
+        if self._users.get_identity("email", normalized_login):
+            raise ValidationError("Login already registered")
+        identity = self._users.add_identity(
+            CreateIdentityInput(
+                user_id=user_id,
+                identity_type="email",
+                identifier=normalized_login,
+                secret_hash=hash_password(password),
+                is_verified=False,
+            )
         )
+        self._session.commit()
+        return identity
+
+    def register_telegram_identity(self, user_id: UUID, telegram_id: int) -> UserIdentityView:
+        identifier = f"telegram:{telegram_id}"
+        existing = self._users.get_identity("telegram", identifier)
+        if existing:
+            return existing
+        identity = self._users.add_identity(
+            CreateIdentityInput(
+                user_id=user_id,
+                identity_type="telegram",
+                identifier=identifier,
+                secret_hash=None,
+                is_verified=True,
+            )
+        )
+        self._session.commit()
+        return identity
+
+    def find_telegram_identity(self, telegram_id: int) -> UserIdentityView | None:
+        return self._users.get_identity("telegram", f"telegram:{telegram_id}")
+
+    def verify_email_identity(self, login: str) -> None:
+        self._users.verify_identity("email", login)
+        self._session.commit()
+
+    def start_email_verification(self, login: str) -> str:
+        identity = self.get_email_identity(login)
+        if identity is None:
+            raise NotFoundError("User not found")
+        settings = get_settings()
+        code = secrets.token_hex(3).upper()
+        code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=settings.email_verification_ttl_seconds)
+        self._users.set_identity_verification(
+            "email",
+            login,
+            code_hash=code_hash,
+            expires_at=expires_at,
+            attempts_left=settings.email_verification_max_attempts,
+        )
+        self._session.commit()
+        return code
+
+    def verify_email_code(self, login: str, code: str) -> None:
+        identity = self.get_email_identity(login)
+        if identity is None:
+            raise NotFoundError("User not found")
+
+        if identity.verification_code_hash is None or identity.verification_expires_at is None:
+            raise ValidationError("No active verification request. Please register again.")
+
+        now = datetime.now(timezone.utc)
+        expires_at = identity.verification_expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+        if now > expires_at:
+            self._users.clear_identity_verification("email", login)
+            self._session.commit()
+            raise ValidationError("Verification code expired. Please register again.")
+
+        submitted_hash = hashlib.sha256(code.strip().upper().encode("utf-8")).hexdigest()
+        if submitted_hash != identity.verification_code_hash:
+            attempts_left = self._users.decrement_identity_attempt("email", login)
+            if attempts_left <= 0:
+                self._users.clear_identity_verification("email", login)
+                self._session.commit()
+                raise ValidationError("Verification attempts exceeded. Please register again.")
+            self._session.commit()
+            expires_in = max(0, int((expires_at - now).total_seconds()))
+            raise ValidationError(f"Invalid verification code. Attempts left: {attempts_left}, expires in: {expires_in}s")
+
+        self._users.verify_identity("email", login)
+        self._session.commit()
 
     def get_auth_token(self, payload: AuthInput) -> AuthTokenView:
-        raise NotImplementedError("Auth / tokens are out of scope for now")
+        identity_type = payload.identity_type.strip().lower()
+        identifier = payload.identifier.strip().lower()
+        identity = self._users.get_identity(identity_type, identifier)
+        if identity is None:
+            raise NotFoundError("User not found")
+        if identity_type == "email":
+            if not identity.is_verified:
+                raise ValidationError("Email is not verified")
+            if identity.secret_hash is None:
+                raise ValidationError("Invalid credentials")
+            if not verify_password(payload.password_hash, identity.secret_hash):
+                raise ValidationError("Invalid credentials")
+        return AuthTokenView(access_token=str(identity.user_id))
+
+    def get_email_identity(self, login: str) -> UserIdentityView | None:
+        return self._users.get_identity("email", login)
+
+    def get_identities(self, user_id: UUID) -> list[UserIdentityView]:
+        return self._users.get_identities_by_user(user_id)
 
     def get_profile(self, user_id: UUID) -> UserView:
         user = self._users.get_by_id(user_id)
         if user is None:
             raise NotFoundError("User not found")
-        return UserView(
-            id=user.id,
-            email=user.email,
-            name=user.name,
-            role=user.role,
-            allow_negative_balance=user.allow_negative_balance,
-        )
+        return self._to_user_view(user)
 
     def update_profile(self, user_id: UUID, payload: UpdateUserInput) -> UserView:
         user = self._users.get_by_id(user_id)
@@ -64,12 +182,14 @@ class UserService(UsersInternalService):
         updated = replace(user, name=new_name)
         self._users.save(updated)
         self._session.commit()
+        return self._to_user_view(updated)
+
+    def _to_user_view(self, user: User) -> UserView:
         return UserView(
-            id=updated.id,
-            email=updated.email,
-            name=updated.name,
-            role=updated.role,
-            allow_negative_balance=updated.allow_negative_balance,
+            id=user.id,
+            name=user.name,
+            role=user.role,
+            allow_negative_balance=user.allow_negative_balance,
         )
 
     @staticmethod
@@ -79,6 +199,3 @@ class UserService(UsersInternalService):
             raise ValidationError("User name cannot be empty")
         return normalized
 
-    @staticmethod
-    def is_password_match(stored_hash: str, incoming_hash: str) -> bool:
-        return stored_hash == incoming_hash

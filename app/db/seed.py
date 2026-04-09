@@ -9,10 +9,11 @@ from sqlalchemy.orm import Session
 
 from app.core.types import now_utc
 from app.modules.billing.models import BalanceLedgerEntryModel, UserBalanceModel
+from app.modules.users.service import hash_password
 from app.modules.feedback.models import FeedbackModel
 from app.modules.history.models import HistoryRecordModel
 from app.modules.neural.models import MlModelModel, MlPredictionTaskModel
-from app.modules.users.models import UserModel
+from app.modules.users.models import UserIdentityModel, UserModel
 
 _ML_MODEL_SPECS: tuple[dict, ...] = (
     {
@@ -41,8 +42,10 @@ _DEFAULT_ML_MODEL_ID = UUID("00000000-0000-4000-8000-000000000001")
 
 _DEMO_USER_ID = UUID("10000000-0000-4000-8000-000000000001")
 _DEMO_ADMIN_ID = UUID("10000000-0000-4000-8000-000000000002")
-_DEMO_USER_EMAIL = "demo@safetalk.local"
-_DEMO_ADMIN_EMAIL = "admin@safetalk.local"
+_DEMO_USER_LOGIN = "demo@safetalk.local"
+_DEMO_ADMIN_LOGIN = "admin@safetalk.local"
+# Один пароль для демо-юзера и админа (bcrypt в БД; логины см. выше).
+_DEMO_SEED_PASSWORD = "DemoPass123"
 
 _DEMO_TASK_ID = UUID("20000000-0000-4000-8000-000000000001")
 _DEMO_HISTORY_ID = UUID("20000000-0000-4000-8000-000000000002")
@@ -63,10 +66,15 @@ def _seed_ml_models(session: Session) -> None:
 
 
 def _seed_demo_users(session: Session) -> None:
+    """Демо-аккаунты для Swagger / проверок.
+
+    demo@safetalk.local / DemoPass123 — обычный пользователь.
+    admin@safetalk.local / DemoPass123 — админ (topup, просмотр чужих профилей при необходимости).
+    """
     demos: tuple[dict, ...] = (
         {
             "id": _DEMO_USER_ID,
-            "email": _DEMO_USER_EMAIL,
+            "login": _DEMO_USER_LOGIN,
             "name": "Demo User",
             "role": "user",
             "credit_id": _DEMO_LEDGER_CREDIT_USER_ID,
@@ -74,7 +82,7 @@ def _seed_demo_users(session: Session) -> None:
         },
         {
             "id": _DEMO_ADMIN_ID,
-            "email": _DEMO_ADMIN_EMAIL,
+            "login": _DEMO_ADMIN_LOGIN,
             "name": "Demo Admin",
             "role": "admin",
             "credit_id": _DEMO_LEDGER_CREDIT_ADMIN_ID,
@@ -82,15 +90,27 @@ def _seed_demo_users(session: Session) -> None:
         },
     )
     for d in demos:
-        if session.scalar(select(UserModel.id).where(UserModel.email == d["email"])):
+        if session.scalar(
+            select(UserIdentityModel.id).where(
+                UserIdentityModel.identity_type == "email",
+                UserIdentityModel.identifier == d["login"],
+            )
+        ):
             continue
         session.add(
             UserModel(
                 id=d["id"],
-                email=d["email"],
-                password_hash="seed-not-for-production",
                 name=d["name"],
                 role=d["role"],
+            )
+        )
+        session.add(
+            UserIdentityModel(
+                user_id=d["id"],
+                identity_type="email",
+                identifier=d["login"],
+                secret_hash=hash_password(_DEMO_SEED_PASSWORD),
+                is_verified=True,
             )
         )
         ts = now_utc()

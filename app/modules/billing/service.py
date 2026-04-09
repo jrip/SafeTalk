@@ -6,16 +6,15 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.modules.billing.entities import BalanceState, CreditTransaction, DebitTransaction, Transaction
-from app.modules.billing.interfaces import BillingInternalService
-from app.modules.billing.ports import BalanceStore
+from app.modules.billing.storage_sqlalchemy import SqlAlchemyBalanceStore
 from app.modules.billing.types import BalanceLedgerEntryView, BalanceView
-from app.modules.users.interfaces import UsersPublicService
+from app.modules.users.service import UserService
 
 
-class BillingService(BillingInternalService):
+class BillingService:
     """Сервис учёта токенов; баланс и журнал в таблицах billing.*."""
 
-    def __init__(self, users: UsersPublicService, balance: BalanceStore, session: Session) -> None:
+    def __init__(self, users: UserService, balance: SqlAlchemyBalanceStore, session: Session) -> None:
         self._users = users
         self._balance = balance
         self._session = session

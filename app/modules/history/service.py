@@ -5,18 +5,29 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.modules.history.interfaces import HistoryInternalService
-from app.modules.history.ports import HistoryStore
+from app.modules.history.storage_sqlalchemy import SqlAlchemyHistoryStore
 from app.modules.history.types import HistoryView
 
 
-class HistoryService(HistoryInternalService):
-    def __init__(self, history: HistoryStore, session: Session) -> None:
+class HistoryService:
+    def __init__(self, history: SqlAlchemyHistoryStore, session: Session) -> None:
         self._history = history
         self._session = session
 
     def get_api_history(self, user_id: UUID) -> list[HistoryView]:
         return self._history.list_for_user(user_id)
+
+    def update_result_for_ml_task(
+        self,
+        user_id: UUID,
+        ml_task_id: UUID,
+        result: str,
+        *,
+        commit: bool = True,
+    ) -> None:
+        self._history.update_result_for_ml_task(user_id, ml_task_id, result)
+        if commit:
+            self._session.commit()
 
     def save_api_request(
         self,

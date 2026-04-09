@@ -10,11 +10,10 @@ from sqlalchemy.orm import Session
 from app.core import now_utc
 from app.modules.billing.entities import BalanceState, CreditTransaction, DebitTransaction, Transaction
 from app.modules.billing.models import BalanceLedgerEntryModel, UserBalanceModel
-from app.modules.billing.ports import BalanceStore
 from app.modules.billing.types import BalanceLedgerEntryView
 
 
-class SqlAlchemyBalanceStore(BalanceStore):
+class SqlAlchemyBalanceStore:
     def __init__(self, session: Session) -> None:
         self._session = session
 

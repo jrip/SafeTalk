@@ -59,6 +59,7 @@ class MlPredictionTaskModel(Base):
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
+    result_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     charged_tokens: Mapped[Decimal] = mapped_column(Numeric(24, 8), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

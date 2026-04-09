@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, String, Uuid, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Uuid, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.config import Base
@@ -20,8 +20,6 @@ class UserModel(Base):
     __tablename__ = "users"
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(64), nullable=False, default="user")
     allow_negative_balance: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -48,3 +46,34 @@ class UserModel(Base):
         back_populates="user",
         passive_deletes=True,
     )
+    identities: Mapped[list[UserIdentityModel]] = relationship(
+        "UserIdentityModel",
+        back_populates="user",
+        passive_deletes=True,
+        cascade="all, delete-orphan",
+    )
+
+
+class UserIdentityModel(Base):
+    __tablename__ = "user_identities"
+    __table_args__ = (
+        UniqueConstraint("identity_type", "identifier", name="uq_user_identities_type_identifier"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    identity_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    identifier: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    secret_hash: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    verification_code_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    verification_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    verification_attempts_left: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user: Mapped[UserModel] = relationship("UserModel", back_populates="identities")
