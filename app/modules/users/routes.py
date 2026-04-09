@@ -52,8 +52,13 @@ class UserResponse(BaseModel):
     identities: list[str]
 
 
+# =============================================================================
+# TODO(TODO): УДАЛИТЬ ПЕРЕД ПРОДОМ — НИКОГДА НЕ ОТДАВАТЬ КОД ВЕРИФИКАЦИИ КЛИЕНТУ
+# TODO(TODO): вернуть response_model=UserResponse, убрать RegisterResponse и поле из тела
+# TODO(TODO): после подключения реальной почты код только по email
+# =============================================================================
 class RegisterResponse(UserResponse):
-    """Ответ регистрации; поле с кодом — только для тестов, убрать перед продом."""
+    """ВРЕМЕННО: см. блочный TODO выше."""
 
     temporary_only_for_test_todo: str = Field(
         description="Код подтверждения email (временно для тестов без почтового сервиса).",
@@ -78,6 +83,7 @@ def _as_json(payload: Any) -> dict[str, Any]:
     return asdict(payload)
 
 
+# TODO(TODO): вместе с RegisterResponse — убрать; см. блок TODO у класса RegisterResponse
 @router.post(
     "/register",
     response_model=RegisterResponse,
@@ -106,6 +112,7 @@ def register(payload: RegisterRequest, c=Depends(_container)) -> dict[str, Any]:
     identities = c.users.get_identities(user.id)
     data = _as_json(user)
     data["identities"] = [f"{i.identity_type}:{i.identifier}" for i in identities]
+    # TODO(TODO): УДАЛИТЬ строку ниже перед продом (утечка кода верификации)
     data["temporary_only_for_test_todo"] = verification_code
     return data
 
