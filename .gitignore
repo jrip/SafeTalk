@@ -5,3 +5,4 @@ app.db
 safetalk_local.db
 **/.env
 LLM_NOTES.local.md
+safetalk-local.db
