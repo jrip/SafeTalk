@@ -74,6 +74,7 @@ class CreatePredictionTaskView:
     status: TaskStatus
     charged_tokens: Decimal
     result_summary: str | None = None
+    completed_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -85,4 +86,5 @@ class MlTaskDetailView:
     status: TaskStatus
     charged_tokens: Decimal
     created_at: datetime
+    completed_at: datetime | None
     result_summary: str | None

@@ -32,6 +32,7 @@ class PredictTaskResponse(BaseModel):
     status: str
     charged_tokens: Decimal
     result_summary: str | None = None
+    completed_at: datetime | None = None
 
 
 class PredictTaskDetailResponse(BaseModel):
@@ -42,6 +43,7 @@ class PredictTaskDetailResponse(BaseModel):
     status: str
     charged_tokens: Decimal
     created_at: datetime
+    completed_at: datetime | None = None
     result_summary: str | None = None
 
 
@@ -62,6 +64,7 @@ def _task_view_to_predict_response(task: Any) -> dict[str, Any]:
         "status": task.status.value if isinstance(task.status, TaskStatus) else str(task.status),
         "charged_tokens": task.charged_tokens,
         "result_summary": task.result_summary,
+        "completed_at": task.completed_at,
     }
 
 
@@ -88,6 +91,7 @@ def get_prediction_task(
         "status": detail.status.value,
         "charged_tokens": detail.charged_tokens,
         "created_at": detail.created_at,
+        "completed_at": detail.completed_at,
         "result_summary": detail.result_summary,
     }
 

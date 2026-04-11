@@ -62,6 +62,7 @@ class MlPredictionTaskModel(Base):
     result_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     charged_tokens: Mapped[Decimal] = mapped_column(Numeric(24, 8), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     history_records: Mapped[list[HistoryRecordModel]] = relationship(
         "HistoryRecordModel",

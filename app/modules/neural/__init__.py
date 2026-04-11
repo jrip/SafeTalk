@@ -1,3 +1,10 @@
+from .ml_task_queue import (
+    MlPredictionFeatures,
+    MlPredictionQueuePayload,
+    MlTaskAlreadyDoneError,
+    MlTaskCompleteFailedError,
+    MlTaskMessageRejectedError,
+)
 from .types import (
     BatchTaskResultView,
     BatchTaskView,
@@ -16,6 +23,11 @@ __all__ = [
     "CreateBatchTaskInput",
     "CreatePredictionTaskView",
     "MlModelMeta",
+    "MlPredictionFeatures",
+    "MlPredictionQueuePayload",
+    "MlTaskAlreadyDoneError",
+    "MlTaskCompleteFailedError",
+    "MlTaskMessageRejectedError",
     "MlTaskDetailView",
     "PredictionView",
     "RunPredictionInput",

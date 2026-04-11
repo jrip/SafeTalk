@@ -58,7 +58,14 @@ class SqlAlchemyHistoryStore:
         )
         self._session.flush()
 
-    def update_result_for_ml_task(self, user_id: UUID, ml_task_id: UUID, result: str) -> None:
+    def update_result_for_ml_task(
+        self,
+        user_id: UUID,
+        ml_task_id: UUID,
+        result: str,
+        *,
+        tokens_charged: Decimal | None = None,
+    ) -> None:
         row = self._session.scalar(
             select(HistoryRecordModel)
             .where(
@@ -70,6 +77,8 @@ class SqlAlchemyHistoryStore:
         )
         if row is not None:
             row.result = result
+            if tokens_charged is not None:
+                row.tokens_charged = tokens_charged
             self._session.flush()
 
     def get_own_record(self, user_id: UUID, record_id: UUID) -> HistoryRecord | None:

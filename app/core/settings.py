@@ -38,6 +38,14 @@ class AppSettings(Settings):
     RABBITMQ_PORT: Optional[int] = None
     RABBITMQ_USER: Optional[str] = None
     RABBITMQ_PASS: Optional[str] = None
+    RABBITMQ_QUEUE_NAME: str = "ml_tasks"
+    # Воркер RabbitMQ (ml_rabbit_worker): при ошибке обработки сообщения
+    # — False: подробный лог, пауза 5 с, nack+requeue (сообщение остаётся в очереди).
+    # — True и ml_worker_skip_errors_limit == -1: любая ошибка — ack, в лог, дальше следующее сообщение.
+    # — True и limit >= 1: столько раз подряд при ошибке можно ack (снять с очереди); после исчерпания — как при False.
+    # Бюджет восстанавливается после успешной обработки сообщения (ack без ошибки) или после «уже завершено».
+    ml_worker_skip_errors: bool = False
+    ml_worker_skip_errors_limit: int = 1
     TELEGRAM_BOT_TOKEN: Optional[str] = None
     TELEGRAM_WEBHOOK_SECRET_TOKEN: Optional[str] = None
     email_verification_ttl_seconds: int = 3600

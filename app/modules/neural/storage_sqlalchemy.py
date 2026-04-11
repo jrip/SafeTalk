@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core import now_utc
 from app.modules.neural.entities import MLTask
 from app.modules.neural.models import MlModelModel, MlPredictionTaskModel
 from app.modules.neural.types import MlModelMeta, TaskStatus
@@ -57,10 +59,13 @@ class SqlAlchemyMlTaskStore:
         )
         self._session.flush()
 
-    def complete_task(self, task_id: UUID, result_summary: str) -> None:
+    def complete_task(self, task_id: UUID, result_summary: str) -> datetime | None:
         row = self._session.get(MlPredictionTaskModel, task_id)
         if row is None:
-            return
+            return None
+        done_at = now_utc()
         row.status = TaskStatus.COMPLETED.value
         row.result_summary = result_summary
+        row.completed_at = done_at
         self._session.flush()
+        return done_at

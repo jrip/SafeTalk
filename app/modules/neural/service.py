@@ -1,15 +1,23 @@
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.core import NotFoundError, ValidationError
+from app.core import NotFoundError, ValidationError, now_utc
 from app.modules.billing.service import BillingService
 from app.modules.history.service import HistoryService
+from app.core.settings import get_settings
 from app.modules.neural.entities import MLTask
 from app.modules.neural.models import MlPredictionTaskModel
+from app.modules.neural.ml_task_queue import (
+    MlPredictionFeatures,
+    MlPredictionQueuePayload,
+    MlTaskCompleteFailedError,
+    publish_ml_prediction_payload,
+)
 from app.modules.neural.storage_sqlalchemy import SqlAlchemyMlModelCatalog, SqlAlchemyMlTaskStore
 from app.modules.neural.types import (
     BatchTaskResultView,
@@ -25,13 +33,15 @@ from app.modules.neural.types import (
 
 def _mock_toxicity_summary(text: str) -> str:
     normalized = text.strip() or " "
-    # Детерминированный «скор» 0.10 … 0.99 для демо без реальной модели.
     bucket = abs(hash(normalized)) % 9000
     score = Decimal(bucket) / Decimal(10000) + Decimal("0.10")
     score = score.quantize(Decimal("0.001"))
     is_toxic = score >= Decimal("0.5")
     label = "toxic" if is_toxic else "ok"
     return f"toxicity: {score}; label: {label}"
+
+
+logger = logging.getLogger(__name__)
 
 
 class NeuralService:
@@ -62,18 +72,6 @@ class NeuralService:
         char_count = Decimal(len(text))
         charge = char_count * meta.price_per_character
 
-        state = self._billing.load_balance_state_for_update(payload.user_id)
-        if charge > 0:
-            self._billing.spend_tokens(
-                payload.user_id,
-                charge,
-                task_id=task.id,
-                commit=False,
-                locked_state=state,
-            )
-
-        # Синхронный мок-инференс; позже — очередь (RabbitMQ) и воркер.
-
         self._ml_tasks.insert_pending(task, charge)
         self._history.save_api_request(
             payload.user_id,
@@ -81,16 +79,54 @@ class NeuralService:
             "PENDING",
             ml_model_id=payload.model_id,
             ml_task_id=task.id,
-            tokens_charged=charge,
+            tokens_charged=None,
             commit=False,
         )
 
+        settings = get_settings()
+        if settings.rabbitmq_url:
+            qmsg = MlPredictionQueuePayload(
+                task_id=task.id,
+                features=MlPredictionFeatures(text=text),
+                model=payload.model_id,
+                timestamp=now_utc().replace(microsecond=0),
+            )
+            publish_ml_prediction_payload(qmsg.model_dump(mode="json"))
+            self._session.commit()
+            return CreatePredictionTaskView(
+                task_id=task.id,
+                user_id=payload.user_id,
+                model_id=payload.model_id,
+                text=text,
+                status=TaskStatus.PENDING,
+                charged_tokens=charge,
+                result_summary=None,
+                completed_at=None,
+            )
+
         result_summary = _mock_toxicity_summary(text)
-        self._ml_tasks.complete_task(task.id, result_summary)
+        done_at = self._ml_tasks.complete_task(task.id, result_summary)
+        if done_at is None:
+            logger.error(
+                "complete_task returned no row (task_id=%s user_id=%s)",
+                task.id,
+                payload.user_id,
+            )
+            raise MlTaskCompleteFailedError(f"ml_prediction_tasks row missing: {task.id}")
+        row = self._session.get(MlPredictionTaskModel, task.id)
+        if row is not None and row.charged_tokens > 0:
+            self._billing.spend_tokens(
+                row.user_id,
+                row.charged_tokens,
+                task_id=row.id,
+                commit=False,
+                force_allow_negative=True,
+            )
         self._history.update_result_for_ml_task(
             payload.user_id,
             task.id,
             result_summary,
+            tokens_charged=charge,
             commit=False,
         )
 
@@ -104,6 +140,7 @@ class NeuralService:
             status=TaskStatus.COMPLETED,
             charged_tokens=charge,
             result_summary=result_summary,
+            completed_at=done_at,
         )
 
     def get_task_for_user(self, user_id: UUID, task_id: UUID) -> MlTaskDetailView:
@@ -122,6 +159,7 @@ class NeuralService:
             status=st,
             charged_tokens=row.charged_tokens,
             created_at=row.created_at,
+            completed_at=row.completed_at,
             result_summary=row.result_summary,
         )
 
