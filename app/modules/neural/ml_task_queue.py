@@ -242,8 +242,6 @@ def _complete_in_session(
     )
     outcome = toxicity_predict(row.text, model_id=row.model_id)
     inference_seconds = time.monotonic() - t_neural
-    time.sleep(1.0)
-    neural_phase_seconds = time.monotonic() - t_neural
     logger.info(
         "%s",
         json.dumps(
@@ -254,8 +252,6 @@ def _complete_in_session(
                 "user_id": str(row.user_id),
                 "model_id": str(row.model_id),
                 "inference_seconds": round(inference_seconds, 4),
-                "emulated_post_inference_sleep_seconds": 1.0,
-                "total_neural_phase_seconds": round(neural_phase_seconds, 4),
                 "is_toxic": outcome.is_toxic,
                 "toxicity_probability": float(outcome.toxicity_probability)
                 if outcome.toxicity_probability is not None

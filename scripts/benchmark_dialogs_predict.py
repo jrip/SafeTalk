@@ -20,6 +20,8 @@ ACCESS_TOKEN = ""
 
 POLL_INTERVAL_SEC = 1.0
 POLL_DEADLINE_PER_TASK_SEC = 300.0
+# На фазу «все задачи уже в очереди, ждём завершения» — суммарный лимит (сек).
+POLL_DEADLINE_BATCH_SEC = 21 * POLL_DEADLINE_PER_TASK_SEC
 # --------------------------------------------------------------------------
 
 
@@ -396,21 +398,44 @@ def main() -> int:
     print(f"BASE_URL={base}\nmodel_id (default)={model_id}\n")
 
     dialogs = _dialogs()
-    rows: list[tuple[DialogCase, str, dict[str, Any]]] = []
+    created: list[tuple[DialogCase, str]] = []
 
+    print("— Фаза 1: создаём все задачи (POST /predict), без ожидания —\n", flush=True)
     for i, d in enumerate(dialogs, start=1):
         print(
             f"[{i}/21] case_key={d.case_key} POST predict «{d.category}/{d.label}»…",
             flush=True,
         )
         tid = _post_predict(base, token, model_id, d.text)
-        print(f"       task_id={tid}, ждём результат…", flush=True)
+        print(f"       task_id={tid}", flush=True)
+        created.append((d, tid))
+
+    print(
+        f"\n— Фаза 2: ждём завершения {len(created)} задач (параллельно на стороне воркеров) —\n",
+        flush=True,
+    )
+    batch_deadline = time.monotonic() + POLL_DEADLINE_BATCH_SEC
+    rows: list[tuple[DialogCase, str, dict[str, Any]]] = []
+    for i, (d, tid) in enumerate(created, start=1):
+        remaining = batch_deadline - time.monotonic()
+        print(
+            f"[{i}/21] case_key={d.case_key} poll GET predict/{tid}… "
+            f"(осталось ≤{max(0.0, remaining):.0f}s до общего дедлайна фазы 2)",
+            flush=True,
+        )
+        if remaining <= 0:
+            err = TimeoutError(
+                f"task_id={tid}: общий дедлайн фазы 2 ({POLL_DEADLINE_BATCH_SEC}s) исчерпан"
+            )
+            print(f"       ОШИБКА: {err}", file=sys.stderr)
+            rows.append((d, tid, {"status": "timeout", "error": str(err)}))
+            continue
         try:
             result = _poll_task(
                 base,
                 token,
                 tid,
-                deadline_sec=POLL_DEADLINE_PER_TASK_SEC,
+                deadline_sec=remaining,
                 interval=POLL_INTERVAL_SEC,
             )
         except TimeoutError as e:
