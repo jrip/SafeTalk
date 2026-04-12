@@ -35,15 +35,22 @@ def _configure_stdio_utf8() -> None:
 
 @dataclass(frozen=True)
 class DialogCase:
+    """case_key — латиница, уникальна; grep по таблице → тот же ключ в кортеже ниже."""
+
+    case_key: str
     category: str  # нежный | средний | сильный
     label: str
     text: str
 
 
 def _dialogs() -> list[DialogCase]:
-    """7 нежных, 7 средней токсичности, 7 сильной (RU, для RuBERT)."""
-    gentle: list[tuple[str, str]] = [
+    """7 нежных, 7 средней токсичности, 7 сильной (RU, для RuBERT).
+
+    Каждая строка: (case_key, label_ru, text). Искать текст: rg 'case_key' scripts/benchmark_dialogs_predict.py
+    """
+    gentle: list[tuple[str, str, str]] = [
         (
+            "g_weekend",
             "выходные",
             "Марина: Привет! Как прошли выходные?\n"
             "Олег: Спасибо, хорошо — был на даче, посадил пару кустов смородины.\n"
@@ -51,6 +58,7 @@ def _dialogs() -> list[DialogCase]:
             "Олег: Давай в следующие выходные сходим в парк, если погода позволит.",
         ),
         (
+            "g_work",
             "работа",
             "Антон: Доброе утро, отчёт за квартал я выложил в общую папку.\n"
             "Светлана: Спасибо, посмотрю до обеда и напишу замечания, если будут.\n"
@@ -58,6 +66,7 @@ def _dialogs() -> list[DialogCase]:
             "Светлана: Отлично, хорошего дня.",
         ),
         (
+            "g_study",
             "учёба",
             "Ира: Ты сделал пятую задачу из списка?\n"
             "Кирилл: Да, вчера вечером. Формулы в методичке понятные.\n"
@@ -65,6 +74,7 @@ def _dialogs() -> list[DialogCase]:
             "Кирилл: Договорились, спасибо.",
         ),
         (
+            "g_family",
             "семья",
             "Бабушка: Внучек, ты поел сегодня?\n"
             "Внук: Да, бабуля, в столовой был — суп и второе.\n"
@@ -72,6 +82,7 @@ def _dialogs() -> list[DialogCase]:
             "Внук: Уже надел куртку, не переживай.",
         ),
         (
+            "g_shopping",
             "покупки",
             "Продавец: Здравствуйте, вам помочь с размером?\n"
             "Клиент: Да, ищу кроссовки 42 размера, нейтральный цвет.\n"
@@ -79,6 +90,7 @@ def _dialogs() -> list[DialogCase]:
             "Клиент: Спасибо большое, посмотрю.",
         ),
         (
+            "g_weather",
             "погода",
             "Сосед: Слышал, завтра дождь обещают.\n"
             "Соседка: Да, в приложении тоже так. Уберу с балкона рассаду.\n"
@@ -86,6 +98,7 @@ def _dialogs() -> list[DialogCase]:
             "Соседка: Спасибо, очень приятно.",
         ),
         (
+            "g_plans",
             "планы",
             "Лена: Может в субботу сходим в кино?\n"
             "Паша: Давай. На восьмой сеанс нормально?\n"
@@ -94,8 +107,9 @@ def _dialogs() -> list[DialogCase]:
         ),
     ]
 
-    medium: list[tuple[str, str]] = [
+    medium: list[tuple[str, str, str]] = [
         (
+            "m_late",
             "раздражение",
             "Вика: Ты опять опоздал, мы уже полчаса ждём.\n"
             "Саша: Ну извини, пробки. Не надо так орать.\n"
@@ -103,6 +117,7 @@ def _dialogs() -> list[DialogCase]:
             "Саша: Ладно, понял, в следующий раз выйду раньше.",
         ),
         (
+            "m_modchat",
             "спор",
             "Модератор: Пожалуйста, без перехода на личности.\n"
             "Участник1: Он сам начал нервничать и переводит тему.\n"
@@ -110,6 +125,7 @@ def _dialogs() -> list[DialogCase]:
             "Модератор: Оба успокойтесь, по факту обсуждения.",
         ),
         (
+            "m_deadline",
             "работа_напряг",
             "Начальник: Срок горит, где отчёт?\n"
             "Сотрудник: Я же писал, что нужны данные от смежников.\n"
@@ -117,6 +133,7 @@ def _dialogs() -> list[DialogCase]:
             "Сотрудник: Ладно, сегодня вечером дотяну как смогу.",
         ),
         (
+            "m_neighbors",
             "соседи",
             "А: Музыка у вас до ночи играла, люди спать хотят.\n"
             "Б: Ну не кричи в дверь, можно было написать в чат.\n"
@@ -124,6 +141,7 @@ def _dialogs() -> list[DialogCase]:
             "Б: Ладно, в выходные потише сделаем.",
         ),
         (
+            "m_gaming",
             "игра",
             "Игрок1: Ты меня слил, это было подло.\n"
             "Игрок2: Сам тупил, нечего на других сваливать.\n"
@@ -131,6 +149,7 @@ def _dialogs() -> list[DialogCase]:
             "Игрок2: Как хочешь.",
         ),
         (
+            "m_grades",
             "родители",
             "Мама: Опять двойка, когда ты начнёшь стараться?\n"
             "Сын: У меня сложная тема, ты не понимаешь.\n"
@@ -138,6 +157,7 @@ def _dialogs() -> list[DialogCase]:
             "Сын: Всё, не хочу сейчас об этом.",
         ),
         (
+            "m_owes",
             "друзья",
             "Костя: Ты мне должен был вчера ответить.\n"
             "Дима: Забыл, было много дел, не делай из этого трагедию.\n"
@@ -146,8 +166,9 @@ def _dialogs() -> list[DialogCase]:
         ),
     ]
 
-    strong: list[tuple[str, str]] = [
+    strong: list[tuple[str, str, str]] = [
         (
+            "s_insults",
             "оскорбления",
             "А: Ты полный идиот, заткнись уже и не лезь не в своё дело.\n"
             "Б: Сам дурак тупой, никто тебя здесь не уважает.\n"
@@ -155,6 +176,7 @@ def _dialogs() -> list[DialogCase]:
             "Б: Сам вали, клоун несчастный.",
         ),
         (
+            "s_threats",
             "угрозы_грубые",
             "Хулиган: Если ещё раз сюда придёшь — получишь по морде, понял?\n"
             "Парень: Не трогай меня, я вызову охрану.\n"
@@ -162,6 +184,7 @@ def _dialogs() -> list[DialogCase]:
             "Парень: Отстань, псих.",
         ),
         (
+            "s_hatewall",
             "ненависть",
             "В чате: Все вы там тупые бараны, один хуже другого.\n"
             "Другой: Заткнись, урод, никто тебя не спрашивал.\n"
@@ -169,6 +192,7 @@ def _dialogs() -> list[DialogCase]:
             "Другой: Иди лечись, ненормальный.",
         ),
         (
+            "s_swear",
             "мат_лёгкий",
             "Один: Чтоб тебя, опять всё сломал.\n"
             "Второй: Да пошёл ты, сам всё ломаешь руками из жопы.\n"
@@ -176,6 +200,7 @@ def _dialogs() -> list[DialogCase]:
             "Второй: Сам придержи, мудак.",
         ),
         (
+            "s_troll",
             "троллинг_жёсткий",
             "Тролль: Ты уродина безмозглая, все смеются за твоей спиной.\n"
             "Жертва: Это токсично, прекрати.\n"
@@ -183,6 +208,7 @@ def _dialogs() -> list[DialogCase]:
             "Жертва: Блокирую тебя.",
         ),
         (
+            "s_driving",
             "агрессия",
             "Водитель: Ты слепой, куда лезешь, я тебя сейчас вытащу из машины!\n"
             "Второй: Попробуй, дебил, я тебя на камеру снимаю.\n"
@@ -190,6 +216,7 @@ def _dialogs() -> list[DialogCase]:
             "Второй: Иди в баню, хамло.",
         ),
         (
+            "s_chat",
             "чат_токсик",
             "Юзер1: ты никчёмное ничтожество иди сдохни\n"
             "Юзер2: сам сдохни урод ебаный\n"
@@ -199,12 +226,12 @@ def _dialogs() -> list[DialogCase]:
     ]
 
     out: list[DialogCase] = []
-    for label, text in gentle:
-        out.append(DialogCase("нежный", label, text))
-    for label, text in medium:
-        out.append(DialogCase("средний", label, text))
-    for label, text in strong:
-        out.append(DialogCase("сильный", label, text))
+    for case_key, label, text in gentle:
+        out.append(DialogCase(case_key, "нежный", label, text))
+    for case_key, label, text in medium:
+        out.append(DialogCase(case_key, "средний", label, text))
+    for case_key, label, text in strong:
+        out.append(DialogCase(case_key, "сильный", label, text))
     assert len(out) == 21
     return out
 
@@ -331,7 +358,10 @@ def main() -> int:
     rows: list[tuple[DialogCase, str, dict[str, Any]]] = []
 
     for i, d in enumerate(dialogs, start=1):
-        print(f"[{i}/21] POST predict «{d.category}/{d.label}»…", flush=True)
+        print(
+            f"[{i}/21] case_key={d.case_key} POST predict «{d.category}/{d.label}»…",
+            flush=True,
+        )
         tid = _post_predict(base, token, model_id, d.text)
         print(f"       task_id={tid}, ждём результат…", flush=True)
         try:
@@ -347,7 +377,8 @@ def main() -> int:
             result = {"status": "timeout", "error": str(e)}
         rows.append((d, tid, result))
 
-    # таблица: рядом с результатом — тип диалога и короткий вывод «как отработало»
+    # таблица: case_key совпадает с первой строкой кортежа в _dialogs() — удобно rg по скрипту
+    col_key = 12
     col_cat = 10
     col_lab = 12
     col_tox = 8
@@ -359,6 +390,8 @@ def main() -> int:
     sep = (
         "+"
         + "-" * 4
+        + "+"
+        + "-" * col_key
         + "+"
         + "-" * col_cat
         + "+"
@@ -377,7 +410,8 @@ def main() -> int:
     )
     print("\n" + sep)
     print(
-        f"| {'№':^2} | {'Диалог':^{col_cat-2}} | {'Сценарий':^{col_lab-2}} | "
+        f"| {'№':^2} | {'case_key':^{col_key}} | {'Диалог':^{col_cat-2}} | "
+        f"{'Сценарий':^{col_lab-2}} | "
         f"{'is_toxic':^{col_tox-2}} | {'p_tox':^{col_prob-2}} | {'status':^{col_st-2}} | "
         f"{'Как отработало':^{col_hint-2}} | {'Фрагмент':^{col_snip-2}} |"
     )
@@ -391,21 +425,29 @@ def main() -> int:
         snip = _truncate(d.text, col_snip)
         hint = _how_it_went(d.category, it if isinstance(it, bool) else None)
         print(
-            f"| {i:2d} | {d.category[:col_cat]:<{col_cat}} | {d.label[:col_lab]:<{col_lab}} | "
+            f"| {i:2d} | {d.case_key[:col_key]:<{col_key}} | "
+            f"{d.category[:col_cat]:<{col_cat}} | {d.label[:col_lab]:<{col_lab}} | "
             f"{it_s:^{col_tox}} | {prob:^{col_prob}} | {st[:col_st]:<{col_st}} | "
             f"{hint[:col_hint]:<{col_hint}} | {snip:<{col_snip}} |"
         )
     print(sep)
 
     print(
-        "\nЛегенда «Как отработало»: для нежкого ждём не токс.; для среднего — ок и так и так; "
+        "\nЛегенда «Как отработало»: для нежного ждём не токс.; для среднего — ок и так и так; "
         "для сильного ждём токс.=да. Колонка «Диалог» = задуманная грязность текста."
     )
-    print("Колонка «p_tox» = toxicity_probability. Полный summary ниже по task_id.")
+    print(
+        "Колонка «p_tox» = toxicity_probability. Полный summary ниже по task_id.\n"
+        "Связь с кодом: скопируйте case_key из таблицы и выполните, например:\n"
+        '  rg "m_neighbors" scripts/benchmark_dialogs_predict.py'
+    )
     for i, (d, tid, r) in enumerate(rows, start=1):
         summ = r.get("result_summary")
         if summ:
-            print(f"\n--- [{i}] {d.category}/{d.label} task_id={tid} ---\n{summ}")
+            print(
+                f"\n--- [{i}] case_key={d.case_key} {d.category}/{d.label} "
+                f"task_id={tid} ---\n{summ}"
+            )
     return 0
 
 

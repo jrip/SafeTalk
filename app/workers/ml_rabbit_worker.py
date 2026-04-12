@@ -205,6 +205,16 @@ def _on_message(
         _reload_failure_budget()
         ch.basic_ack(delivery_tag=delivery_tag)
     except MlTaskMessageRejectedError as exc:
+        if not exc.requeue_message:
+            logger.warning(
+                "сиротское сообщение (нет строки задачи), ack без requeue: worker_id=%s delivery_tag=%s %s",
+                worker_id,
+                delivery_tag,
+                exc.reason,
+            )
+            _reload_failure_budget()
+            ch.basic_ack(delivery_tag=delivery_tag)
+            return
         logger.error(
             "сообщение отклонено проверками согласованности с БД: worker_id=%s delivery_tag=%s %s",
             worker_id,

@@ -30,9 +30,10 @@ class MlTaskCompleteFailedError(DomainError):
 class MlTaskMessageRejectedError(Exception):
     """Сообщение очереди не согласуется с задачей в БД — обработку нужно повторить или снять по политике."""
 
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: str, *, requeue_message: bool = True) -> None:
         super().__init__(reason)
         self.reason = reason
+        self.requeue_message = requeue_message
 
 
 class MlTaskAlreadyDoneError(Exception):
@@ -128,13 +129,15 @@ def _complete_in_session(
 
     row = db.get(MlPredictionTaskModel, msg.task_id)
     if row is None:
-        logger.error(
-            "задача в БД не найдена (сообщение нельзя считать выполненным): worker_id=%s task_id=%s",
+        logger.warning(
+            "в БД нет задачи для сообщения из очереди (часто после сброса Postgres при живом Rabbit): "
+            "worker_id=%s task_id=%s — сообщение будет снято с очереди без requeue",
             wid,
             msg.task_id,
         )
         raise MlTaskMessageRejectedError(
             f"задача не найдена в БД: task_id={msg.task_id}",
+            requeue_message=False,
         )
     if row.status != TaskStatus.PENDING.value:
         logger.info(
