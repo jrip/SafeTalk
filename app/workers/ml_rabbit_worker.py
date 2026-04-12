@@ -23,6 +23,7 @@ from app.modules.neural.ml_task_queue import (
     MlTaskCompleteFailedError,
     MlTaskMessageRejectedError,
     complete_ml_task_from_queue_message,
+    text_preview_for_log,
 )
 
 logger = logging.getLogger(__name__)
@@ -172,7 +173,7 @@ def _on_message(
     delivery_tag = method.delivery_tag
     try:
         logger.info(
-            "получено сообщение из RabbitMQ: worker_id=%s delivery_tag=%s размер_тела=%s байт",
+            "получено сырое сообщение из RabbitMQ: worker_id=%s delivery_tag=%s размер_тела=%s байт",
             worker_id,
             delivery_tag,
             len(body),
@@ -180,11 +181,22 @@ def _on_message(
         data: Any = json.loads(body.decode("utf-8"))
         msg = MlPredictionQueuePayload.model_validate(data)
         logger.info(
-            "тело сообщения прошло валидацию: worker_id=%s task_id=%s model=%s timestamp=%s",
-            worker_id,
-            msg.task_id,
-            msg.model,
-            msg.timestamp,
+            "%s",
+            json.dumps(
+                {
+                    "event": "rabbit_ml_task_parsed",
+                    "worker_id": worker_id,
+                    "delivery_tag": delivery_tag,
+                    "body_bytes": len(body),
+                    "task_id": str(msg.task_id),
+                    "model": str(msg.model),
+                    "timestamp": msg.timestamp.isoformat(),
+                    "text_len": len(msg.features.text),
+                    "text_preview": text_preview_for_log(msg.features.text),
+                },
+                ensure_ascii=False,
+                default=str,
+            ),
         )
         complete_ml_task_from_queue_message(msg, worker_id=worker_id)
         _reload_failure_budget()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -21,6 +22,27 @@ from app.modules.neural.storage_sqlalchemy import SqlAlchemyMlTaskStore
 from app.modules.neural.types import TaskStatus
 
 logger = logging.getLogger(__name__)
+
+_TEXT_PREVIEW_MAX = 500
+
+
+def text_preview_for_log(text: str, max_len: int = _TEXT_PREVIEW_MAX) -> str:
+    """Укороченный фрагмент для логов (без заливки консоли целым диалогом)."""
+    t = text.replace("\n", " ↵ ")
+    if len(t) <= max_len:
+        return t
+    return t[: max_len - 1] + "…"
+
+
+def _settings_fingerprint() -> str:
+    """Без паролей: чтобы в логах сироты сразу видеть, в какую БД/Rabbit смотрит воркер."""
+    s = get_settings()
+    explicit_db_url = bool((s.database_url or "").strip())
+    return (
+        f"db_host={s.DB_HOST!r} db_port={s.DB_PORT!r} db_name={s.DB_NAME!r} "
+        f"explicit_database_url={explicit_db_url} rabbit_host={s.RABBITMQ_HOST!r} "
+        f"queue={s.RABBITMQ_QUEUE_NAME!r}"
+    )
 
 
 class MlTaskCompleteFailedError(DomainError):
@@ -119,21 +141,33 @@ def _complete_in_session(
 
     wid = worker_id or "неизвестен"
     logger.info(
-        "начало обработки ML-задачи из очереди: worker_id=%s task_id=%s model=%s ts=%s длина_текста=%s",
-        wid,
-        msg.task_id,
-        msg.model,
-        msg.timestamp,
-        len(msg.features.text),
+        "%s",
+        json.dumps(
+            {
+                "event": "ml_queue_session_start",
+                "worker_id": wid,
+                "task_id": str(msg.task_id),
+                "model": str(msg.model),
+                "timestamp": msg.timestamp.isoformat(),
+                "text_len": len(msg.features.text),
+                "text_preview": text_preview_for_log(msg.features.text),
+            },
+            ensure_ascii=False,
+            default=str,
+        ),
     )
 
     row = db.get(MlPredictionTaskModel, msg.task_id)
     if row is None:
         logger.warning(
-            "в БД нет задачи для сообщения из очереди (часто после сброса Postgres при живом Rabbit): "
-            "worker_id=%s task_id=%s — сообщение будет снято с очереди без requeue",
-            wid,
+            "сирота ML: в БД нет строки ml_prediction_tasks для task_id=%s (воркер %s). "
+            "На «чистом» стеке чаще всего это гонка API: сообщение ушло в Rabbit до commit транзакции "
+            "(Postgres READ COMMITTED — другая сессия не видит строку); в сервисе порядок исправлен на commit→publish. "
+            "Реже: один Rabbit на два разных Postgres, или только БД сбросили, а очередь — нет. "
+            "Ack без requeue. [%s]",
             msg.task_id,
+            wid,
+            _settings_fingerprint(),
         )
         raise MlTaskMessageRejectedError(
             f"задача не найдена в БД: task_id={msg.task_id}",
@@ -185,14 +219,53 @@ def _complete_in_session(
         )
         raise MlTaskMessageRejectedError("несовпадение текста задачи с сообщением в очереди")
 
-    outcome = toxicity_predict(row.text, model_id=row.model_id)
+    t_neural = time.monotonic()
     logger.info(
-        "инференс выполнен: worker_id=%s task_id=%s model_id=%s is_toxic=%s p=%s",
-        wid,
-        msg.task_id,
-        row.model_id,
-        outcome.is_toxic,
-        outcome.toxicity_probability,
+        "%s",
+        json.dumps(
+            {
+                "event": "neural_inference_start",
+                "worker_id": wid,
+                "task_id": str(msg.task_id),
+                "user_id": str(row.user_id),
+                "model_id": str(row.model_id),
+                "db_status": row.status,
+                "charged_tokens": str(row.charged_tokens),
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "queue_timestamp": msg.timestamp.isoformat(),
+                "text_len": len(row.text),
+                "text_preview": text_preview_for_log(row.text),
+            },
+            ensure_ascii=False,
+            default=str,
+        ),
+    )
+    outcome = toxicity_predict(row.text, model_id=row.model_id)
+    inference_seconds = time.monotonic() - t_neural
+    time.sleep(1.0)
+    neural_phase_seconds = time.monotonic() - t_neural
+    logger.info(
+        "%s",
+        json.dumps(
+            {
+                "event": "neural_inference_finished",
+                "worker_id": wid,
+                "task_id": str(msg.task_id),
+                "user_id": str(row.user_id),
+                "model_id": str(row.model_id),
+                "inference_seconds": round(inference_seconds, 4),
+                "emulated_post_inference_sleep_seconds": 1.0,
+                "total_neural_phase_seconds": round(neural_phase_seconds, 4),
+                "is_toxic": outcome.is_toxic,
+                "toxicity_probability": float(outcome.toxicity_probability)
+                if outcome.toxicity_probability is not None
+                else None,
+                "breakdown": outcome.breakdown,
+                "summary_preview": text_preview_for_log(outcome.summary or "", max_len=600),
+            },
+            ensure_ascii=False,
+            default=str,
+        ),
     )
 
     ml_store = SqlAlchemyMlTaskStore(db)

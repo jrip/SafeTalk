@@ -83,6 +83,9 @@ class NeuralService:
 
         settings = get_settings()
         if settings.rabbitmq_url:
+            # Сначала commit: иначе воркер может взять сообщение из Rabbit раньше,
+            # чем транзакция API станет видимой (READ COMMITTED) — «задачи нет в БД».
+            self._session.commit()
             qmsg = MlPredictionQueuePayload(
                 task_id=task.id,
                 features=MlPredictionFeatures(text=text),
@@ -90,7 +93,6 @@ class NeuralService:
                 timestamp=now_utc().replace(microsecond=0),
             )
             publish_ml_prediction_payload(qmsg.model_dump(mode="json"))
-            self._session.commit()
             return CreatePredictionTaskView(
                 task_id=task.id,
                 user_id=payload.user_id,
