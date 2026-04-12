@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SafeTalk — токсичность текста для бизнеса и продуктов</title>
+  <meta name="description" content="SafeTalk: асинхронная проверка русскоязычных текстов на токсичность через API и очередь ML. Для маркетплейсов, поддержки, модерации и разработчиков." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #06060a;
+      --bg1: #0e0e16;
+      --surface: #14141f;
+      --surface2: #1a1a2a;
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f0f0f5;
+      --muted: #9898ac;
+      --accent: #2ee6be;
+      --accent-dim: rgba(46, 230, 190, 0.15);
+      --warm: #ffb547;
+      --warm-dim: rgba(255, 181, 71, 0.12);
+      --danger: #ff6b6b;
+      --radius: 14px;
+      --radius-sm: 10px;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+      --max: 1120px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Outfit", system-ui, sans-serif;
+      background: var(--bg0);
+      color: var(--text);
+      line-height: 1.55;
+      font-size: 1.05rem;
+    }
+
+    .bg-mesh {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background:
+        radial-gradient(ellipse 100% 80% at 10% -10%, rgba(46, 230, 190, 0.12), transparent 50%),
+        radial-gradient(ellipse 80% 60% at 90% 20%, rgba(255, 181, 71, 0.08), transparent 45%),
+        radial-gradient(ellipse 60% 40% at 50% 100%, rgba(100, 120, 255, 0.06), transparent 40%),
+        linear-gradient(180deg, var(--bg0) 0%, var(--bg1) 45%, var(--bg0) 100%);
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+    .wrap { max-width: var(--max); margin: 0 auto; padding: 0 1.25rem; }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(14px);
+      background: rgba(6, 6, 10, 0.75);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.85rem 0;
+      flex-wrap: wrap;
+    }
+    .logo {
+      font-weight: 800;
+      font-size: 1.35rem;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .logo-mark {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--warm));
+      box-shadow: 0 0 18px rgba(46, 230, 190, 0.5);
+    }
+    .nav-links {
+      display: flex;
+      gap: 1.35rem;
+      flex-wrap: wrap;
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+    .nav-links a { color: var(--muted); }
+    .nav-links a:hover { color: var(--text); }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.65rem 1.15rem;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 0.92rem;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #1ad4b0, #0eb894);
+      color: #041210;
+      box-shadow: 0 8px 32px rgba(46, 230, 190, 0.25);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 40px rgba(46, 230, 190, 0.35); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    .hero { padding: 4.5rem 0 3.5rem; }
+    @media (min-width: 900px) {
+      .hero-grid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 3rem;
+        align-items: center;
+      }
+    }
+    .eyebrow {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+    }
+    h1 {
+      font-size: clamp(2.1rem, 4.5vw, 3.25rem);
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -0.035em;
+      margin: 0 0 1rem;
+    }
+    .hero-lead {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 34rem;
+      margin-bottom: 1.75rem;
+    }
+    .hero-cta { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 2rem; }
+    .trust-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.25rem 2rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .trust-row strong { color: var(--text); }
+
+    .code-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .code-panel header {
+      position: static;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.65rem 1rem;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-family: "JetBrains Mono", monospace;
+    }
+    .code-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .code-panel pre {
+      margin: 0;
+      padding: 1rem 1.1rem 1.15rem;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.78rem;
+      line-height: 1.55;
+      color: #c8c8d8;
+      overflow-x: auto;
+    }
+    .code-panel .k { color: #7fdbca; }
+    .code-panel .s { color: #ffd479; }
+
+    section { padding: 3.25rem 0; }
+    section.alt { background: rgba(20, 20, 31, 0.5); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    h2 {
+      font-size: clamp(1.65rem, 3vw, 2.1rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 0 0 0.5rem;
+    }
+    .section-intro { color: var(--muted); max-width: 40rem; margin-bottom: 2rem; }
+
+    .grid-2 {
+      display: grid;
+      gap: 1.25rem;
+    }
+    @media (min-width: 720px) {
+      .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    }
+    .grid-3 {
+      display: grid;
+      gap: 1.25rem;
+    }
+    @media (min-width: 900px) {
+      .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem 1.35rem;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .card:hover {
+      border-color: rgba(46, 230, 190, 0.35);
+      transform: translateY(-2px);
+    }
+    .card-tag {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--warm);
+      margin-bottom: 0.5rem;
+    }
+    .card-tag.enterprise { color: var(--accent); }
+    .card-tag.dev { color: #a8b4ff; }
+    .card h3 { margin: 0 0 0.65rem; font-size: 1.2rem; font-weight: 700; }
+    .card p { margin: 0; color: var(--muted); font-size: 0.98rem; }
+    .card ul { margin: 0.75rem 0 0; padding-left: 1.1rem; color: var(--muted); font-size: 0.95rem; }
+    .card ul li { margin-bottom: 0.35rem; }
+
+    .steps {
+      counter-reset: step;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .steps li {
+      position: relative;
+      padding-left: 3.25rem;
+      margin-bottom: 1.5rem;
+      border-left: 2px solid var(--border);
+      margin-left: 0.85rem;
+      padding-bottom: 0.25rem;
+    }
+    .steps li:last-child { border-left-color: transparent; margin-bottom: 0; }
+    .steps li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: -0.85rem;
+      transform: translateX(-50%);
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 2px solid var(--accent);
+      color: var(--accent);
+      font-weight: 800;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pill-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+    .pill {
+      font-size: 0.78rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: 999px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .pill.warm { background: var(--warm-dim); color: var(--warm); }
+
+    footer {
+      padding: 2.5rem 0;
+      border-top: 1px solid var(--border);
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; align-items: center; }
+
+    .footnote {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 2rem;
+      padding: 1rem;
+      background: rgba(255, 107, 107, 0.06);
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255, 107, 107, 0.15);
+    }
+  </style>
+</head>
+<body id="top">
+  <div class="bg-mesh" aria-hidden="true"></div>
+
+  <header>
+    <div class="wrap nav">
+      <a href="#" class="logo"><span class="logo-mark" aria-hidden="true"></span> SafeTalk</a>
+      <nav class="nav-links" aria-label="Оглавление">
+        <a href="#audience">Аудитория</a>
+        <a href="#offer">Что даём</a>
+        <a href="#flow">Как работает</a>
+        <a href="#examples">Сценарии</a>
+        <a href="#dev">Для разработчиков</a>
+      </nav>
+      <a class="btn btn-primary" href="/docs">API в Swagger</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <p class="eyebrow">Модерация и риски · русский язык</p>
+          <h1>Токсичность текста — без очереди у вашей команды</h1>
+          <p class="hero-lead">
+            <strong>SafeTalk</strong> — сервис проверки сообщений и диалогов на токсичность: каталог моделей и правила агрегации результатов.
+            Запросы принимает <strong>REST API</strong>, тяжёлый ML уходит в <strong>RabbitMQ</strong> и обрабатывается
+            <strong>несколькими воркерами</strong> — вы не упираетесь в один процесс и можете масштабировать поток.
+          </p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="/docs">Попробовать в /docs</a>
+            <a class="btn btn-ghost" href="#audience">Кому подойдёт</a>
+          </div>
+          <div class="trust-row">
+            <span><strong>Асинхронно</strong> — POST /predict → task_id → GET результат</span>
+            <span><strong>Токены</strong> — оплата за объём текста</span>
+            <span><strong>Интеграция</strong> — Telegram webhook при необходимости</span>
+          </div>
+        </div>
+        <div class="code-panel" aria-label="Пример запроса">
+          <header>
+            <span class="code-dot" style="background:#ff5f57"></span>
+            <span class="code-dot" style="background:#febc2e"></span>
+            <span class="code-dot" style="background:#28c840"></span>
+            <span>POST /predict · ответ по заданию</span>
+          </header>
+          <pre><span class="k">POST</span> /predict
+Authorization: Bearer …
+
+{
+  <span class="s">"model_id"</span>: <span class="s">"&lt;из GET /predict/models&gt;"</span>,
+  <span class="s">"text"</span>: <span class="s">"Диалог или абзац для проверки…"</span>
+}
+
+→ { <span class="s">"task_id"</span>: <span class="s">"uuid"</span> }
+→ <span class="k">GET</span> /predict/{task_id} … completed</pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="audience" class="alt">
+      <div class="wrap">
+        <h2>Кто ваша аудитория — и что им предложить</h2>
+        <p class="section-intro">
+          Один продукт, разные «покупатели» внутри компании. Ниже — типичные роли и как SafeTalk закрывает их задачу без лишней суеты.
+        </p>
+
+        <div class="grid-2" style="margin-bottom:1.25rem">
+          <div class="card">
+            <div class="card-tag enterprise">Крупные клиенты</div>
+            <h3>Маркетплейсы, банки, телеком, EdTech</h3>
+            <p>Высокий поток пользовательского текста: отзывы, чаты поддержки, комментарии, UGC.</p>
+            <ul>
+              <li><strong>Предлагаем:</strong> API + очередь — пики нагрузки не валят API-процесс; воркеры масштабируются горизонтально; аудит и биллинг по факту объёма.</li>
+              <li><strong>Дообучение:</strong> адаптация модели под ваш домен (лексика поддержки, внутренний сленг, отраслевые формулировки) — отдельная дорожка с данными и политикой качества.</li>
+              <li><strong>Специальные условия:</strong> объёмы, сроки, пилоты и коммерческие рамки под контракт — не «как с сайта», а под ваш закупочный процесс.</li>
+              <li><strong>Кастомные интеграции:</strong> VPC / выделенные воркеры, нестандартные потоки (очереди, webhooks, выгрузки в ваш SIEM / DWH), совместная схема с ИБ и комплаенсом.</li>
+            </ul>
+            <div class="pill-row">
+              <span class="pill">высокий RPS</span>
+              <span class="pill">аудит и биллинг</span>
+              <span class="pill">fine-tuning</span>
+              <span class="pill warm">enterprise</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-tag">Средний и малый бизнес</div>
+            <h3>Сервисы с чатом, CRM, небольшие площадки</h3>
+            <p>Нужно «поймать» оскорбления и угрозы до эскалации, не нанимая армию модераторов на первую линию.</p>
+            <ul>
+              <li><strong>Предлагаем:</strong> простой контракт API — создать задачу, опросить статус, получить <code>is_toxic</code> и разбор меток.</li>
+              <li><strong>Ценность:</strong> несколько моделей в каталоге — выбираете вариант под задачу и бюджет (разная цена за символ, разный компромисс скорость/качество).</li>
+              <li><strong>Внедрение:</strong> несколько вызовов в день из вашего бэкенда или скрипта отдела качества.</li>
+            </ul>
+            <div class="pill-row">
+              <span class="pill warm">честная цена за символ</span>
+              <span class="pill">без «тяжёлого» API</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-tag">Линия поддержки</div>
+            <h3>Кто общается с клиентами</h3>
+            <p>Операторы и тимлиды качества: нужна подсказка «красная зона» до отправки ответа или после входящего.</p>
+            <ul>
+              <li><strong>Предлагаем:</strong> проверка переписки пачками через ваш внутренний инструмент (который дергает API).</li>
+              <li><strong>Ценность:</strong> снижение репутационных рисков и выгорания — токсичность подсвечивается системой.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card-tag">Модераторы и доверие</div>
+            <h3>Кто держит площадку в чистоте</h3>
+            <p>Контент-модерация, детские сервисы, профессиональные сообщества.</p>
+            <ul>
+              <li><strong>Предлагаем:</strong> второй многогранник к человеку — ML как фильтр очереди жалоб и автопометки.</li>
+              <li><strong>Ценность:</strong> объяснимый <code>result_summary</code> с вероятностями и разбором по классам — проще правила эскалации в модерации.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card-tag dev">Telegram-бот</div>
+            <h3>Кто уже ведёт аудиторию в мессенджере</h3>
+            <p>Школы курсов, локальные сервисы, community-менеджеры: весь трафик уже в Telegram.</p>
+            <ul>
+              <li><strong>Предлагаем:</strong> webhook <code>/telegram/…</code> — обработка апдейтов на вашей стороне (при настройке секрета и токена бота).</li>
+              <li><strong>Ценность:</strong> единый бэкенд: и REST для веба, и тот же ML-контур для бота.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="offer">
+      <div class="wrap">
+        <h2>Что именно мы предлагаем</h2>
+        <p class="section-intro">
+          Коротко: не «чёрный ящик в чате», а предсказуемый сервис с очередью, учётом и прозрачным ответом по задаче.
+        </p>
+        <div class="grid-3">
+          <div class="card">
+            <h3>Архитектура под нагрузку</h3>
+            <p>Publisher (FastAPI) принимает <code>POST /predict</code>, пишет задачу в БД и отправляет JSON в одну durable-очередь RabbitMQ. Consumers (ML-воркеры) забирают сообщения и дописывают результат.</p>
+          </div>
+          <div class="card">
+            <h3>Разные модели — одна точка входа</h3>
+            <p>Каталог активных моделей: переключайтесь под сценарий (жёстче/мягче, дороже/дешевле). Ответ по задаче — вероятности, агрегированное решение и текстовое резюме для ваших правил.</p>
+          </div>
+          <div class="card">
+            <h3>Экономика токенов</h3>
+            <p>Списание привязано к длине текста и тарифу модели. Для крупного клиента — прогнозируемый чек; для малого — нет платы «за простой сервер».</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="flow" class="alt">
+      <div class="wrap">
+        <h2>Как это работает для интегратора</h2>
+        <p class="section-intro">Поток, который можно показать архитектору и бизнесу — без лишней магии.</p>
+        <ol class="steps">
+          <li>
+            <strong>Авторизация</strong> — <code>POST /auth/login</code>, токен в заголовке для защищённых ручек.
+          </li>
+          <li>
+            <strong>Создание задачи</strong> — <code>POST /predict</code> с <code>model_id</code> и текстом; в ответе только <code>task_id</code> (асинхронный контракт).
+          </li>
+          <li>
+            <strong>Очередь</strong> — сообщение с <code>task_id</code>, признаками и временем уходит в RabbitMQ; свободный воркер забирает работу (round-robin между воркерами).
+          </li>
+          <li>
+            <strong>Результат</strong> — клиент опрашивает <code>GET /predict/{task_id}</code> до статуса <code>completed</code> или обрабатывает ошибку/таймаут по своей политике.
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="examples">
+      <div class="wrap">
+        <h2>Примеры использования</h2>
+        <p class="section-intro">Готовые истории «зачем это в проде» — можно переносить в презентацию или ТЗ на интеграцию.</p>
+        <div class="grid-2">
+          <div class="card">
+            <h3>Премодерация отзывов</h3>
+            <p>Перед публикацией на витрине — асинхронная проверка; при подозрении — в ручную модерацию, иначе — в эфир.</p>
+          </div>
+          <div class="card">
+            <h3>Очередь обращений в поддержку</h3>
+            <p>Автоматическая метка «возможная агрессия» для супервизора и приоритизации ответа.</p>
+          </div>
+          <div class="card">
+            <h3>Внутренние переписки (HR / комплаенс)</h3>
+            <p>Выборочный скрининг при соблюдении локальных политик и согласий — технически тот же API.</p>
+          </div>
+          <div class="card">
+            <h3>Бот в Telegram</h3>
+            <p>После настройки webhook — единый пайплайн: сообщения пользователей попадают в ваш обработчик и при необходимости в ML-очередь.</p>
+          </div>
+        </div>
+
+        <p class="footnote">
+          <strong>Важно:</strong> SafeTalk даёт технический сигнал токсичности, а решения «банить / не банить» и юридические рамки остаются на стороне продукта и комплаенса.
+        </p>
+      </div>
+    </section>
+
+    <section id="dev" class="alt">
+      <div class="wrap">
+        <h2>Для разработчиков и продакта</h2>
+        <p class="section-intro">
+          В репозитории есть сценарный скрипт нагрузочного прогона диалогов (<code>scripts/benchmark_dialogs_predict.py</code>): сначала пачка <code>POST</code>, затем опрос —
+          удобно демонстрировать работу двух воркеров и отсутствие потери задач.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="/docs">Открыть Swagger</a>
+          <a class="btn btn-ghost" href="#flow">Схема потока</a>
+        </div>
+        <p style="color:var(--muted);font-size:0.9rem;margin-top:1rem">
+          Статическая страница лежит в <code>static/index.htm</code>. Чтобы отдавать её с корня без прокси на FastAPI, добавьте в nginx отдельный <code>location</code> на файлы из <code>static/</code> — иначе откройте файл локально или повесьте раздачу через приложение.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>© SafeTalk — демонстрационный сервис проверки токсичности текста.</span>
+      <span><a href="/docs">/docs</a> · <a href="#top">Наверх</a></span>
+    </div>
+  </footer>
+</body>
+</html>
