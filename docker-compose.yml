@@ -14,9 +14,8 @@ services:
       database:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
 
-  
   ml-worker:
     build:
       context: .
@@ -33,7 +32,7 @@ services:
       - ./app:/workspace/app
     depends_on:
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     restart: on-failure
     scale: 2
 
@@ -53,6 +52,12 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 25s
 
   database:
     image: postgres:16-alpine

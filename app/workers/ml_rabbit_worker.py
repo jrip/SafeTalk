@@ -10,7 +10,9 @@ from json import JSONDecodeError
 from typing import Any
 
 import pika
+import pika.exceptions
 from pydantic import ValidationError
+from pika.adapters.blocking_connection import BlockingConnection
 from pika.channel import Channel
 from pika.spec import Basic, BasicProperties
 
@@ -24,6 +26,9 @@ from app.modules.neural.ml_task_queue import (
 )
 
 logger = logging.getLogger(__name__)
+
+_CONNECT_ATTEMPTS = 90
+_CONNECT_RETRY_DELAY_SEC = 2.0
 
 # Остаток «пропусков» ack при ошибке (только если ml_worker_skip_errors и limit >= 1).
 _failure_ack_budget_remaining: int | None = None
@@ -255,6 +260,32 @@ def _on_message(
         )
 
 
+def _blocking_connection_with_retry(url: str) -> BlockingConnection:
+    """RabbitMQ после healthcheck иногда ещё секунду не принимает AMQP — повторяем подключение."""
+    params = pika.URLParameters(url)
+    last: BaseException | None = None
+    for attempt in range(1, _CONNECT_ATTEMPTS + 1):
+        try:
+            return pika.BlockingConnection(params)
+        except (
+            pika.exceptions.AMQPConnectionError,
+            ConnectionRefusedError,
+            TimeoutError,
+            OSError,
+        ) as exc:
+            last = exc
+            logger.warning(
+                "RabbitMQ недоступен (%s/%s): %s; пауза %.1f с",
+                attempt,
+                _CONNECT_ATTEMPTS,
+                exc,
+                _CONNECT_RETRY_DELAY_SEC,
+            )
+            time.sleep(_CONNECT_RETRY_DELAY_SEC)
+    logger.error("не удалось подключиться к RabbitMQ после %s попыток", _CONNECT_ATTEMPTS)
+    raise last if last is not None else RuntimeError("RabbitMQ connection failed")
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
     settings = get_settings()
@@ -272,8 +303,7 @@ def main() -> None:
         settings.ml_worker_skip_errors_limit,
     )
 
-    params = pika.URLParameters(url)
-    connection = pika.BlockingConnection(params)
+    connection = _blocking_connection_with_retry(url)
     channel = connection.channel()
     channel.queue_declare(queue=queue_name, durable=True)
     channel.basic_qos(prefetch_count=1)
