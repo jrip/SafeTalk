@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 import time
 from datetime import datetime
 from typing import Any
@@ -242,6 +243,12 @@ def _complete_in_session(
     )
     outcome = toxicity_predict(row.text, model_id=row.model_id)
     inference_seconds = time.monotonic() - t_neural
+    # TODO(TODO): убрать перед продом — искусственная пауза 1–2 с только для демо (видимость долгой модели).
+    delay_sec = random.uniform(1.0, 2.0)
+    t_delay_start = time.monotonic()
+    time.sleep(delay_sec)
+    delay_wall_seconds = time.monotonic() - t_delay_start
+    total_neural_wall_seconds = time.monotonic() - t_neural
     logger.info(
         "%s",
         json.dumps(
@@ -252,6 +259,9 @@ def _complete_in_session(
                 "user_id": str(row.user_id),
                 "model_id": str(row.model_id),
                 "inference_seconds": round(inference_seconds, 4),
+                "artificial_delay_requested_seconds": round(delay_sec, 4),
+                "artificial_delay_wall_seconds": round(delay_wall_seconds, 4),
+                "total_neural_wall_seconds": round(total_neural_wall_seconds, 4),
                 "is_toxic": outcome.is_toxic,
                 "toxicity_probability": float(outcome.toxicity_probability)
                 if outcome.toxicity_probability is not None
