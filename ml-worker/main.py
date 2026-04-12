@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 _CONNECT_ATTEMPTS = 90
 _CONNECT_RETRY_DELAY_SEC = 2.0
 
+# Остаток «пропусков» ack при ошибке (только если ml_worker_skip_errors и limit >= 1).
 _failure_ack_budget_remaining: int | None = None
 
 
@@ -282,6 +283,7 @@ def _on_message(
 
 
 def _blocking_connection_with_retry(url: str) -> BlockingConnection:
+    """RabbitMQ после healthcheck иногда ещё секунду не принимает AMQP — повторяем подключение."""
     params = pika.URLParameters(url)
     last: BaseException | None = None
     for attempt in range(1, _CONNECT_ATTEMPTS + 1):
