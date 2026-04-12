@@ -166,7 +166,7 @@ async def lifespan(app: FastAPI):
     _configure_logging()
     validate_settings()
     await asyncio.to_thread(_init_db_schema_and_seed)
-    await asyncio.to_thread(_startup_playbook)
+    #await asyncio.to_thread(_startup_playbook)
     yield
 
 
