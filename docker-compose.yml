@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   app:
     build:
@@ -18,6 +16,7 @@ services:
       rabbitmq:
         condition: service_started
 
+  
   ml-worker:
     build:
       context: .
@@ -36,6 +35,7 @@ services:
       rabbitmq:
         condition: service_started
     restart: on-failure
+    scale: 2
 
   web-proxy:
     build: ./web-proxy

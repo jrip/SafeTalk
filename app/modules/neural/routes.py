@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -13,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.bootstrap import build_app_container
 from app.core.api_models import ErrorResponse
 from app.db.database import get_db
-from app.modules.neural.types import RunPredictionInput, TaskStatus
+from app.modules.neural.types import RunPredictionInput
 from app.modules.users.auth import require_user_id
 
 router = APIRouter(prefix="/predict", tags=["predict"])
@@ -24,18 +23,10 @@ class PredictRequest(BaseModel):
     text: str = Field(min_length=1)
 
 
-class PredictTaskResponse(BaseModel):
+class CreatePredictTaskResponse(BaseModel):
+    """Ответ POST /predict по ТЗ: только идентификатор созданной задачи."""
+
     task_id: UUID
-    user_id: UUID
-    model_id: UUID
-    text: str
-    status: str
-    charged_tokens: Decimal
-    result_summary: str | None = None
-    completed_at: datetime | None = None
-    is_toxic: bool | None = None
-    toxicity_probability: Decimal | None = None
-    toxicity_breakdown: dict[str, float] | None = None
 
 
 class MlModelCatalogItemResponse(BaseModel):
@@ -64,26 +55,6 @@ class PredictTaskDetailResponse(BaseModel):
 
 def _container(session: Session = Depends(get_db)):
     return build_app_container(session)
-
-
-def _as_json(payload: Any) -> dict[str, Any]:
-    return asdict(payload)
-
-
-def _task_view_to_predict_response(task: Any) -> dict[str, Any]:
-    return {
-        "task_id": task.task_id,
-        "user_id": task.user_id,
-        "model_id": task.model_id,
-        "text": task.text,
-        "status": task.status.value if isinstance(task.status, TaskStatus) else str(task.status),
-        "charged_tokens": task.charged_tokens,
-        "result_summary": task.result_summary,
-        "completed_at": task.completed_at,
-        "is_toxic": getattr(task, "is_toxic", None),
-        "toxicity_probability": getattr(task, "toxicity_probability", None),
-        "toxicity_breakdown": getattr(task, "toxicity_breakdown", None),
-    }
 
 
 @router.get(
@@ -144,7 +115,7 @@ def get_prediction_task(
 
 @router.post(
     "",
-    response_model=PredictTaskResponse,
+    response_model=CreatePredictTaskResponse,
     status_code=status.HTTP_200_OK,
     responses={
         401: {"model": ErrorResponse},
@@ -162,4 +133,4 @@ def predict(payload: PredictRequest, c=Depends(_container), current_user_id: UUI
             text=payload.text,
         )
     )
-    return _task_view_to_predict_response(task)
+    return {"task_id": task.task_id}

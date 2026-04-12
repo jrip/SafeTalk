@@ -138,6 +138,20 @@ def _complete_in_session(
         )
     if row.status != TaskStatus.PENDING.value:
         logger.info(
+            "%s",
+            json.dumps(
+                {
+                    "task_id": str(msg.task_id),
+                    "prediction": None,
+                    "worker_id": wid,
+                    "status": "duplicate_delivery",
+                    "detail": "задача уже не PENDING, БД не меняем",
+                    "db_task_status": row.status,
+                },
+                ensure_ascii=False,
+            ),
+        )
+        logger.info(
             "задача уже не в статусе PENDING — дубликат доставки, запись в БД не меняем: "
             "worker_id=%s task_id=%s status=%s",
             wid,
@@ -189,6 +203,31 @@ def _complete_in_session(
         )
         raise MlTaskCompleteFailedError(f"ml_prediction_tasks row missing: {msg.task_id}")
     row_after = db.get(MlPredictionTaskModel, msg.task_id)
+    logger.info(
+        "%s",
+        json.dumps(
+            {
+                "task_id": str(msg.task_id),
+                "prediction": outcome.toxicity_probability,
+                "worker_id": wid,
+                "status": "success",
+                "is_toxic": outcome.is_toxic,
+                "toxicity_probability": outcome.toxicity_probability,
+                "breakdown": outcome.breakdown,
+                "summary": outcome.summary,
+                "model_id": str(msg.model),
+                "db_task_status": row_after.status if row_after else None,
+                "db_is_toxic": row_after.is_toxic if row_after else None,
+                "db_toxicity_probability": float(row_after.toxicity_probability)
+                if row_after and row_after.toxicity_probability is not None
+                else None,
+                "db_toxicity_breakdown": row_after.toxicity_breakdown if row_after else None,
+                "completed_at": done_at.isoformat(),
+            },
+            ensure_ascii=False,
+            default=str,
+        ),
+    )
     if row_after is not None and row_after.charged_tokens > 0:
         _, billing = build_user_and_billing(db)
         billing.spend_tokens(
