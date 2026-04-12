@@ -46,7 +46,6 @@ def _init_failure_budget_from_settings() -> None:
 
 
 def _reload_failure_budget() -> None:
-    """После успешной обработки восстанавливаем бюджет пропусков из настроек."""
     global _failure_ack_budget_remaining
     s = get_settings()
     if s.ml_worker_skip_errors and s.ml_worker_skip_errors_limit >= 1:
@@ -67,7 +66,6 @@ def _apply_delivery_failure_policy(
     *,
     context: str,
 ) -> None:
-    """Ошибка обработки: либо ack по политике «пропуск», либо пауза 5 с и nack+requeue."""
     s = get_settings()
     skip = s.ml_worker_skip_errors
     limit = s.ml_worker_skip_errors_limit

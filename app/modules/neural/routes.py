@@ -33,6 +33,18 @@ class PredictTaskResponse(BaseModel):
     charged_tokens: Decimal
     result_summary: str | None = None
     completed_at: datetime | None = None
+    is_toxic: bool | None = None
+    toxicity_probability: Decimal | None = None
+    toxicity_breakdown: dict[str, float] | None = None
+
+
+class MlModelCatalogItemResponse(BaseModel):
+    id: UUID
+    slug: str
+    name: str
+    description: str
+    price_per_character: Decimal
+    is_default: bool
 
 
 class PredictTaskDetailResponse(BaseModel):
@@ -45,6 +57,9 @@ class PredictTaskDetailResponse(BaseModel):
     created_at: datetime
     completed_at: datetime | None = None
     result_summary: str | None = None
+    is_toxic: bool | None = None
+    toxicity_probability: Decimal | None = None
+    toxicity_breakdown: dict[str, float] | None = None
 
 
 def _container(session: Session = Depends(get_db)):
@@ -65,7 +80,35 @@ def _task_view_to_predict_response(task: Any) -> dict[str, Any]:
         "charged_tokens": task.charged_tokens,
         "result_summary": task.result_summary,
         "completed_at": task.completed_at,
+        "is_toxic": getattr(task, "is_toxic", None),
+        "toxicity_probability": getattr(task, "toxicity_probability", None),
+        "toxicity_breakdown": getattr(task, "toxicity_breakdown", None),
     }
+
+
+@router.get(
+    "/models",
+    response_model=list[MlModelCatalogItemResponse],
+    responses={
+        401: {"model": ErrorResponse},
+    },
+)
+def list_ml_models(
+    c=Depends(_container),
+    _current_user_id: UUID = Depends(require_user_id),
+) -> list[dict[str, Any]]:
+    items = c.neural.list_catalog_models()
+    return [
+        {
+            "id": m.id,
+            "slug": m.slug,
+            "name": m.name,
+            "description": m.description,
+            "price_per_character": m.price_per_character,
+            "is_default": m.is_default,
+        }
+        for m in items
+    ]
 
 
 @router.get(
@@ -93,6 +136,9 @@ def get_prediction_task(
         "created_at": detail.created_at,
         "completed_at": detail.completed_at,
         "result_summary": detail.result_summary,
+        "is_toxic": detail.is_toxic,
+        "toxicity_probability": detail.toxicity_probability,
+        "toxicity_breakdown": detail.toxicity_breakdown,
     }
 
 

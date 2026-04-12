@@ -18,27 +18,20 @@ from app.modules.neural.ml_task_queue import (
     MlTaskCompleteFailedError,
     publish_ml_prediction_payload,
 )
+from app.ml_models.constants import ML_MODEL_TOXIC_LITE_ID
 from app.modules.neural.storage_sqlalchemy import SqlAlchemyMlModelCatalog, SqlAlchemyMlTaskStore
+from app.modules.neural.toxicity_pipeline import toxicity_predict
 from app.modules.neural.types import (
     BatchTaskResultView,
     BatchTaskView,
     CreateBatchTaskInput,
     CreatePredictionTaskView,
+    MlModelCatalogItemView,
     MlTaskDetailView,
     PredictionView,
     RunPredictionInput,
     TaskStatus,
 )
-
-
-def _mock_toxicity_summary(text: str) -> str:
-    normalized = text.strip() or " "
-    bucket = abs(hash(normalized)) % 9000
-    score = Decimal(bucket) / Decimal(10000) + Decimal("0.10")
-    score = score.quantize(Decimal("0.001"))
-    is_toxic = score >= Decimal("0.5")
-    label = "toxic" if is_toxic else "ok"
-    return f"toxicity: {score}; label: {label}"
 
 
 logger = logging.getLogger(__name__)
@@ -67,6 +60,11 @@ class NeuralService:
         meta = self._ml_models.get_model_meta(payload.model_id)
         if meta is None or not meta.is_active:
             raise NotFoundError("ML model not found or inactive")
+
+        if payload.model_id == ML_MODEL_TOXIC_LITE_ID:
+            raise ValidationError(
+                "Модель «Toxicity lite» пока не поддерживается API; выберите основную модель токсичности.",
+            )
 
         task = MLTask(user_id=payload.user_id, model_id=payload.model_id, text=text)
         char_count = Decimal(len(text))
@@ -102,10 +100,13 @@ class NeuralService:
                 charged_tokens=charge,
                 result_summary=None,
                 completed_at=None,
+                is_toxic=None,
+                toxicity_probability=None,
+                toxicity_breakdown=None,
             )
 
-        result_summary = _mock_toxicity_summary(text)
-        done_at = self._ml_tasks.complete_task(task.id, result_summary)
+        outcome = toxicity_predict(text, model_id=payload.model_id)
+        done_at = self._ml_tasks.complete_task(task.id, outcome)
         if done_at is None:
             logger.error(
                 "complete_task returned no row (task_id=%s user_id=%s)",
@@ -125,7 +126,7 @@ class NeuralService:
         self._history.update_result_for_ml_task(
             payload.user_id,
             task.id,
-            result_summary,
+            outcome.summary,
             tokens_charged=charge,
             commit=False,
         )
@@ -139,8 +140,11 @@ class NeuralService:
             text=text,
             status=TaskStatus.COMPLETED,
             charged_tokens=charge,
-            result_summary=result_summary,
+            result_summary=outcome.summary,
             completed_at=done_at,
+            is_toxic=outcome.is_toxic,
+            toxicity_probability=Decimal(str(round(outcome.toxicity_probability, 8))),
+            toxicity_breakdown=outcome.breakdown,
         )
 
     def get_task_for_user(self, user_id: UUID, task_id: UUID) -> MlTaskDetailView:
@@ -151,6 +155,9 @@ class NeuralService:
             st = TaskStatus(row.status)
         except ValueError:
             st = TaskStatus.PENDING
+        bd = row.toxicity_breakdown
+        if bd is not None and not isinstance(bd, dict):
+            bd = None
         return MlTaskDetailView(
             task_id=row.id,
             user_id=row.user_id,
@@ -161,6 +168,9 @@ class NeuralService:
             created_at=row.created_at,
             completed_at=row.completed_at,
             result_summary=row.result_summary,
+            is_toxic=row.is_toxic,
+            toxicity_probability=row.toxicity_probability,
+            toxicity_breakdown=bd,
         )
 
     def get_default_model_id(self) -> UUID:
@@ -168,6 +178,9 @@ class NeuralService:
         if meta is None:
             raise NotFoundError("No active ML model configured")
         return meta.id
+
+    def list_catalog_models(self) -> list[MlModelCatalogItemView]:
+        return self._ml_models.list_active_catalog_items()
 
     def get_toxicity(self, payload: RunPredictionInput) -> PredictionView:
         raise NotImplementedError("Neural processing is mocked at this stage")

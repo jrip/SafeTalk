@@ -9,6 +9,7 @@ services:
       - app/.env
     environment:
       RABBITMQ_HOST: rabbitmq
+      ML_TOXICITY_BACKEND: rubert
     volumes:
       - ./app:/workspace/app
     depends_on:
@@ -26,8 +27,7 @@ services:
       - app/.env
     environment:
       RABBITMQ_HOST: rabbitmq
-      # Воркер: false = при ошибке пауза 5 с и сообщение возвращается в очередь.
-      # true + limit=-1 = при любой ошибке ack (снять с очереди). true + limit>=1 = столько ack-при-ошибке подряд.
+      ML_TOXICITY_BACKEND: rubert
       ML_WORKER_SKIP_ERRORS: "false"
       ML_WORKER_SKIP_ERRORS_LIMIT: "1"
     volumes:

@@ -114,7 +114,7 @@ def _complete_in_session(
     *,
     worker_id: str | None = None,
 ) -> None:
-    from app.modules.neural.service import _mock_toxicity_summary
+    from app.modules.neural.toxicity_pipeline import toxicity_predict
 
     wid = worker_id or "неизвестен"
     logger.info(
@@ -168,16 +168,18 @@ def _complete_in_session(
         )
         raise MlTaskMessageRejectedError("несовпадение текста задачи с сообщением в очереди")
 
-    result_summary = _mock_toxicity_summary(row.text)
+    outcome = toxicity_predict(row.text, model_id=row.model_id)
     logger.info(
-        "mock-предсказание выполнено: worker_id=%s task_id=%s результат=%s статус=success",
+        "инференс выполнен: worker_id=%s task_id=%s model_id=%s is_toxic=%s p=%s",
         wid,
         msg.task_id,
-        result_summary,
+        row.model_id,
+        outcome.is_toxic,
+        outcome.toxicity_probability,
     )
 
     ml_store = SqlAlchemyMlTaskStore(db)
-    done_at = ml_store.complete_task(msg.task_id, result_summary)
+    done_at = ml_store.complete_task(msg.task_id, outcome)
     if done_at is None:
         logger.error(
             "complete_task не обновил строку: worker_id=%s task_id=%s user_id=%s",
@@ -209,7 +211,7 @@ def _complete_in_session(
     history.update_result_for_ml_task(
         row.user_id,
         msg.task_id,
-        result_summary,
+        outcome.summary,
         tokens_charged=row.charged_tokens,
         commit=False,
     )

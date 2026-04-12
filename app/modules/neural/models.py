@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text, Uuid, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Numeric, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.config import Base
@@ -60,6 +60,9 @@ class MlPredictionTaskModel(Base):
     text: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     result_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_toxic: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    toxicity_probability: Mapped[Decimal | None] = mapped_column(Numeric(10, 8), nullable=True)
+    toxicity_breakdown: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     charged_tokens: Mapped[Decimal] = mapped_column(Numeric(24, 8), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
