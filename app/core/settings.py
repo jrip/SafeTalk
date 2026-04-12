@@ -38,6 +38,11 @@ class AppSettings(Settings):
     RABBITMQ_PORT: Optional[int] = None
     RABBITMQ_USER: Optional[str] = None
     RABBITMQ_PASS: Optional[str] = None
+    RABBITMQ_QUEUE_NAME: str = "ml_tasks"
+    ml_worker_skip_errors: bool = False
+    ml_worker_skip_errors_limit: int = 1
+    ml_toxicity_backend: str = "mock"
+    ml_toxicity_max_length: int = 384
     TELEGRAM_BOT_TOKEN: Optional[str] = None
     TELEGRAM_WEBHOOK_SECRET_TOKEN: Optional[str] = None
     email_verification_ttl_seconds: int = 3600

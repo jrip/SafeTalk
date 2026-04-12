@@ -23,9 +23,12 @@ class HistoryService:
         ml_task_id: UUID,
         result: str,
         *,
+        tokens_charged: Decimal | None = None,
         commit: bool = True,
     ) -> None:
-        self._history.update_result_for_ml_task(user_id, ml_task_id, result)
+        self._history.update_result_for_ml_task(
+            user_id, ml_task_id, result, tokens_charged=tokens_charged
+        )
         if commit:
             self._session.commit()
 

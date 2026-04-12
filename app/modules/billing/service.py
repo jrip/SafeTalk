@@ -70,12 +70,19 @@ class BillingService:
         *,
         commit: bool = True,
         locked_state: BalanceState | None = None,
+        force_allow_negative: bool = False,
     ) -> BalanceView:
         state = locked_state if locked_state is not None else self.load_balance_state_for_update(user_id)
         if state.user_id != user_id:
             raise ValueError("locked_state.user_id does not match user_id")
+        apply_state = BalanceState(
+            user_id=state.user_id,
+            token_count=state.token_count,
+            allow_negative_balance=state.allow_negative_balance or force_allow_negative,
+            updated_at=state.updated_at,
+        )
         tx = DebitTransaction(user_id=user_id, amount=count, task_id=task_id)
-        updated = self._apply_transaction(state, tx)
+        updated = self._apply_transaction(apply_state, tx)
         if commit:
             self._session.commit()
         return BalanceView(user_id=updated.user_id, token_count=updated.token_count)

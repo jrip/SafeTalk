@@ -16,6 +16,18 @@ class MlModelMeta:
     is_active: bool
 
 
+@dataclass(frozen=True)
+class MlModelCatalogItemView:
+    """Публичное описание модели для REST (каталог)."""
+
+    id: UUID
+    slug: str
+    name: str
+    description: str
+    price_per_character: Decimal
+    is_default: bool
+
+
 class TaskStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"
@@ -65,8 +77,6 @@ class BatchTaskResultView:
 
 @dataclass(frozen=True)
 class CreatePredictionTaskView:
-    """Результат ML-задачи после синхронного мок-инференса."""
-
     task_id: UUID
     user_id: UUID
     model_id: UUID
@@ -74,6 +84,10 @@ class CreatePredictionTaskView:
     status: TaskStatus
     charged_tokens: Decimal
     result_summary: str | None = None
+    completed_at: datetime | None = None
+    is_toxic: bool | None = None
+    toxicity_probability: Decimal | None = None
+    toxicity_breakdown: dict[str, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -85,4 +99,8 @@ class MlTaskDetailView:
     status: TaskStatus
     charged_tokens: Decimal
     created_at: datetime
+    completed_at: datetime | None
     result_summary: str | None
+    is_toxic: bool | None = None
+    toxicity_probability: Decimal | None = None
+    toxicity_breakdown: dict[str, float] | None = None

@@ -4,7 +4,6 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 from decimal import Decimal
-from uuid import UUID
 
 from fastapi import FastAPI
 from sqlalchemy import select
@@ -22,6 +21,7 @@ from app.modules.system.routes import router as system_router
 from app.modules.telegram.routes import router as telegram_router
 from app.modules.users.routes import router as auth_router, users_router
 from app.db.seed import run_seed
+from app.ml_models.constants import ML_MODEL_RUBERT_TOXICITY_ID
 from app.modules.neural.models import MlPredictionTaskModel
 from app.modules.neural.types import RunPredictionInput
 from app.modules.users.models import UserIdentityModel, UserModel
@@ -38,9 +38,6 @@ def _configure_logging() -> None:
 
 _configure_logging()
 log = logging.getLogger(__name__)
-
-_ML_MODEL_ID = UUID("00000000-0000-4000-8000-000000000001")
-
 
 def _user_view_from_db(session: Session, login: str) -> UserView | None:
     identity = session.scalar(
@@ -117,13 +114,21 @@ def _startup_playbook() -> None:
                 log.info("u2 стало: %s", c.billing.add_tokens(u2.id, topup_amount).token_count)
 
                 ml1 = c.neural.create_prediction_task(
-                    RunPredictionInput(user_id=u1.id, model_id=_ML_MODEL_ID, text="hello toxicity check"),
+                    RunPredictionInput(
+                        user_id=u1.id,
+                        model_id=ML_MODEL_RUBERT_TOXICITY_ID,
+                        text="hello toxicity check",
+                    ),
                 )
                 log.info("u1 ML-задача создана: task_id=%s, цена=%s", ml1.task_id, ml1.charged_tokens)
                 log.info("u1 баланс после ML: %s", c.billing.get_count_tokens(u1.id).token_count)
 
                 ml2 = c.neural.create_prediction_task(
-                    RunPredictionInput(user_id=u2.id, model_id=_ML_MODEL_ID, text="another ml run"),
+                    RunPredictionInput(
+                        user_id=u2.id,
+                        model_id=ML_MODEL_RUBERT_TOXICITY_ID,
+                        text="another ml run",
+                    ),
                 )
                 log.info("u2 ML-задача создана: task_id=%s, цена=%s", ml2.task_id, ml2.charged_tokens)
                 log.info("u2 баланс после ML: %s", c.billing.get_count_tokens(u2.id).token_count)

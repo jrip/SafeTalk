@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Session
+
+if TYPE_CHECKING:
+    from app.modules.neural.service import NeuralService
 
 from app.modules.billing.service import BillingService
 from app.modules.billing.storage_sqlalchemy import SqlAlchemyBalanceStore
@@ -10,8 +14,6 @@ from app.modules.feedback.service import FeedbackService
 from app.modules.feedback.storage_sqlalchemy import SqlAlchemyFeedbackStore
 from app.modules.history.service import HistoryService
 from app.modules.history.storage_sqlalchemy import SqlAlchemyHistoryStore
-from app.modules.neural.service import NeuralService
-from app.modules.neural.storage_sqlalchemy import SqlAlchemyMlModelCatalog, SqlAlchemyMlTaskStore
 from app.modules.users.service import UserService
 from app.modules.users.storage_sqlalchemy import SqlAlchemyUserStore
 
@@ -25,14 +27,22 @@ class AppContainer:
     feedback: FeedbackService
 
 
-def build_app_container(session: Session) -> AppContainer:
+def build_user_and_billing(session: Session) -> tuple[UserService, BillingService]:
     user_store = SqlAlchemyUserStore(session)
     balance_store = SqlAlchemyBalanceStore(session)
+    user_service = UserService(user_store, balance_store, session)
+    billing_service = BillingService(user_service, balance_store, session)
+    return user_service, billing_service
+
+
+def build_app_container(session: Session) -> AppContainer:
+    from app.modules.neural.service import NeuralService
+    from app.modules.neural.storage_sqlalchemy import SqlAlchemyMlModelCatalog, SqlAlchemyMlTaskStore
+
+    user_service, billing_service = build_user_and_billing(session)
     history_store = SqlAlchemyHistoryStore(session)
     feedback_store = SqlAlchemyFeedbackStore(session)
 
-    user_service = UserService(user_store, balance_store, session)
-    billing_service = BillingService(user_service, balance_store, session)
     history_service = HistoryService(history_store, session)
     feedback_service = FeedbackService(feedback_store, history_store, session)
 

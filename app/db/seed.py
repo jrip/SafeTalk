@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from decimal import Decimal
 from uuid import UUID
 
@@ -12,33 +11,34 @@ from app.modules.billing.models import BalanceLedgerEntryModel, UserBalanceModel
 from app.modules.users.service import hash_password
 from app.modules.feedback.models import FeedbackModel
 from app.modules.history.models import HistoryRecordModel
+from app.ml_models.constants import ML_MODEL_RUBERT_TOXICITY_ID, ML_MODEL_TOXIC_LITE_ID
 from app.modules.neural.models import MlModelModel, MlPredictionTaskModel
 from app.modules.users.models import UserIdentityModel, UserModel
 
 _ML_MODEL_SPECS: tuple[dict, ...] = (
     {
-        "id": UUID("00000000-0000-4000-8000-000000000001"),
+        "id": ML_MODEL_RUBERT_TOXICITY_ID,
         "slug": "toxic-baseline",
-        "name": "Toxicity baseline",
-        "description": "Базовая модель токсичности для демо.",
+        "name": "RuBERT-tiny toxicity",
+        "description": "Multilabel токсичность (HF cointegrated/rubert-tiny-toxicity), русский чат.",
         "version": "1.0.0",
         "is_active": True,
         "is_default": True,
-        "price_per_character": Decimal("0.01"),
+        "price_per_character": Decimal("1.00"),
     },
     {
-        "id": UUID("00000000-0000-4000-8000-000000000002"),
+        "id": ML_MODEL_TOXIC_LITE_ID,
         "slug": "toxic-lite",
         "name": "Toxicity lite",
-        "description": "Облегчённая модель (дешевле за запрос).",
+        "description": "Облегчённая модель (дешевле за запрос); инференс в API пока не подключён.",
         "version": "1.0.0",
         "is_active": True,
         "is_default": False,
-        "price_per_character": Decimal("0.005"),
+        "price_per_character": Decimal("0.50"),
     },
 )
 
-_DEFAULT_ML_MODEL_ID = UUID("00000000-0000-4000-8000-000000000001")
+_DEFAULT_ML_MODEL_ID = ML_MODEL_RUBERT_TOXICITY_ID
 
 _DEMO_USER_ID = UUID("10000000-0000-4000-8000-000000000001")
 _DEMO_ADMIN_ID = UUID("10000000-0000-4000-8000-000000000002")
