@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -14,11 +15,26 @@ from urllib.parse import urljoin
 
 # --- настройки ------------------------------------------------------------
 BASE_URL = "http://192.168.1.139"
-ACCESS_TOKEN = "kavf9ek96LV8Dz_cuwRuhawTDoAsMzxlphp-ngrEKvg"
+# Если непустой — используется как Bearer (например из окружения: ACCESS_TOKEN=…).
+ACCESS_TOKEN = ""
 
 POLL_INTERVAL_SEC = 1.0
 POLL_DEADLINE_PER_TASK_SEC = 300.0
 # --------------------------------------------------------------------------
+
+
+def _repo_root() -> str:
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _seed_demo_credentials() -> tuple[str, str]:
+    """Логин и пароль демо-пользователя — те же, что в app/db/seed.py (_DEMO_USER_LOGIN / _DEMO_SEED_PASSWORD)."""
+    root = _repo_root()
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from app.db.seed import _DEMO_SEED_PASSWORD, _DEMO_USER_LOGIN
+
+    return _DEMO_USER_LOGIN, _DEMO_SEED_PASSWORD
 
 
 def _configure_stdio_utf8() -> None:
@@ -241,14 +257,15 @@ def _request_json(
     url: str,
     *,
     body: dict[str, Any] | None = None,
-    token: str,
+    token: str | None,
     timeout: float = 120.0,
 ) -> tuple[int, Any]:
     data = None if body is None else json.dumps(body, ensure_ascii=False).encode("utf-8")
     headers = {"Accept": "application/json"}
     if body is not None:
         headers["Content-Type"] = "application/json; charset=utf-8"
-    headers["Authorization"] = f"Bearer {token}"
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -257,6 +274,19 @@ def _request_json(
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"HTTP {e.code} {url}: {err}") from e
+
+
+def _login_access_token(base: str, login: str, password: str) -> str:
+    url = urljoin(base.rstrip("/") + "/", "auth/login")
+    _, payload = _request_json(
+        "POST",
+        url,
+        body={"login": login, "password": password},
+        token=None,
+    )
+    if not isinstance(payload, dict) or not payload.get("access_token"):
+        raise RuntimeError(f"ожидался {{access_token}}: {payload!r}")
+    return str(payload["access_token"])
 
 
 def _default_model_id(base: str, token: str) -> str:
@@ -341,10 +371,21 @@ def _how_it_went(category: str, is_toxic: bool | None) -> str:
 def main() -> int:
     _configure_stdio_utf8()
     base = BASE_URL.rstrip("/")
-    token = ACCESS_TOKEN.strip()
+    token = (ACCESS_TOKEN.strip() or os.environ.get("ACCESS_TOKEN", "").strip())
     if not token:
-        print("Задай ACCESS_TOKEN в скрипте.", file=sys.stderr)
-        return 2
+        try:
+            demo_login, demo_password = _seed_demo_credentials()
+            token = _login_access_token(base, demo_login, demo_password)
+        except Exception as e:
+            print(
+                "Нет ACCESS_TOKEN и не удалось выполнить POST /auth/login "
+                f"учёткой из app/db/seed.py: {e}",
+                file=sys.stderr,
+            )
+            return 2
+        print(f"Авторизация: POST /auth/login ({demo_login})\n")
+    else:
+        print("Авторизация: готовый ACCESS_TOKEN\n")
 
     try:
         model_id = _default_model_id(base, token)

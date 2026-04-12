@@ -297,7 +297,12 @@ def _blocking_connection_with_retry(url: str) -> BlockingConnection:
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        force=True,
+    )
     settings = get_settings()
     url = settings.rabbitmq_url
     if not url:
