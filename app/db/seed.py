@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from decimal import Decimal
 from uuid import UUID
 
@@ -10,35 +9,32 @@ from sqlalchemy.orm import Session
 from app.core.types import now_utc
 from app.modules.billing.models import BalanceLedgerEntryModel, UserBalanceModel
 from app.modules.users.service import hash_password
-from app.modules.feedback.models import FeedbackModel
-from app.modules.history.models import HistoryRecordModel
-from app.modules.neural.models import MlModelModel, MlPredictionTaskModel
+from app.ml_models.constants import ML_MODEL_RUBERT_TOXICITY_ID, ML_MODEL_TOXIC_LITE_ID
+from app.modules.neural.models import MlModelModel
 from app.modules.users.models import UserIdentityModel, UserModel
 
 _ML_MODEL_SPECS: tuple[dict, ...] = (
     {
-        "id": UUID("00000000-0000-4000-8000-000000000001"),
+        "id": ML_MODEL_RUBERT_TOXICITY_ID,
         "slug": "toxic-baseline",
-        "name": "Toxicity baseline",
-        "description": "Базовая модель токсичности для демо.",
+        "name": "RuBERT-tiny toxicity",
+        "description": "Multilabel токсичность (HF cointegrated/rubert-tiny-toxicity), русский чат.",
         "version": "1.0.0",
         "is_active": True,
         "is_default": True,
-        "price_per_character": Decimal("0.01"),
+        "price_per_character": Decimal("1.00"),
     },
     {
-        "id": UUID("00000000-0000-4000-8000-000000000002"),
+        "id": ML_MODEL_TOXIC_LITE_ID,
         "slug": "toxic-lite",
         "name": "Toxicity lite",
-        "description": "Облегчённая модель (дешевле за запрос).",
+        "description": "Облегчённая модель (дешевле за запрос); инференс в API пока не подключён.",
         "version": "1.0.0",
         "is_active": True,
         "is_default": False,
-        "price_per_character": Decimal("0.005"),
+        "price_per_character": Decimal("0.50"),
     },
 )
-
-_DEFAULT_ML_MODEL_ID = UUID("00000000-0000-4000-8000-000000000001")
 
 _DEMO_USER_ID = UUID("10000000-0000-4000-8000-000000000001")
 _DEMO_ADMIN_ID = UUID("10000000-0000-4000-8000-000000000002")
@@ -47,12 +43,8 @@ _DEMO_ADMIN_LOGIN = "admin@safetalk.local"
 # Один пароль для демо-юзера и админа (bcrypt в БД; логины см. выше).
 _DEMO_SEED_PASSWORD = "DemoPass123"
 
-_DEMO_TASK_ID = UUID("20000000-0000-4000-8000-000000000001")
-_DEMO_HISTORY_ID = UUID("20000000-0000-4000-8000-000000000002")
-_DEMO_LEDGER_DEBIT_ID = UUID("20000000-0000-4000-8000-000000000003")
 _DEMO_LEDGER_CREDIT_USER_ID = UUID("20000000-0000-4000-8000-000000000004")
 _DEMO_LEDGER_CREDIT_ADMIN_ID = UUID("20000000-0000-4000-8000-000000000005")
-_DEMO_FEEDBACK_ID = UUID("20000000-0000-4000-8000-000000000006")
 _DEMO_LEDGER_DEBIT_ADMIN_ID = UUID("20000000-0000-4000-8000-000000000007")
 
 
@@ -133,68 +125,6 @@ def _seed_demo_users(session: Session) -> None:
     session.flush()
 
 
-def _seed_demo_user_rich_data(session: Session) -> None:
-    if session.get(MlPredictionTaskModel, _DEMO_TASK_ID) is not None:
-        return
-    if session.get(UserModel, _DEMO_USER_ID) is None:
-        return
-
-    demo_text = "Sample demo text for SafeTalk."
-    price = Decimal("0.01")
-    charge = Decimal(len(demo_text)) * price
-
-    bal = session.get(UserBalanceModel, _DEMO_USER_ID)
-    if bal is None:
-        return
-    if bal.token_count < charge:
-        return
-
-    ts = now_utc()
-    session.add(
-        MlPredictionTaskModel(
-            id=_DEMO_TASK_ID,
-            user_id=_DEMO_USER_ID,
-            model_id=_DEFAULT_ML_MODEL_ID,
-            text=demo_text,
-            status="pending",
-            charged_tokens=charge,
-        )
-    )
-    session.add(
-        HistoryRecordModel(
-            id=_DEMO_HISTORY_ID,
-            user_id=_DEMO_USER_ID,
-            ml_model_id=_DEFAULT_ML_MODEL_ID,
-            ml_task_id=_DEMO_TASK_ID,
-            request=demo_text,
-            result="PENDING",
-            tokens_charged=charge,
-        )
-    )
-    session.add(
-        BalanceLedgerEntryModel(
-            id=_DEMO_LEDGER_DEBIT_ID,
-            user_id=_DEMO_USER_ID,
-            kind="debit",
-            amount=charge,
-            task_id=_DEMO_TASK_ID,
-        )
-    )
-    bal.token_count = bal.token_count - charge
-    bal.updated_at = ts
-
-    session.add(
-        FeedbackModel(
-            id=_DEMO_FEEDBACK_ID,
-            history_id=_DEMO_HISTORY_ID,
-            user_id=_DEMO_USER_ID,
-            is_toxic=False,
-            comment="seed demo feedback",
-        )
-    )
-    session.flush()
-
-
 def _seed_demo_admin_debit(session: Session) -> None:
     """Ручное списание в демо-данных (админ): пополнение уже в _seed_demo_users."""
     if session.get(BalanceLedgerEntryModel, _DEMO_LEDGER_DEBIT_ADMIN_ID) is not None:
@@ -223,9 +153,8 @@ def _seed_demo_admin_debit(session: Session) -> None:
 
 
 def run_seed(session: Session) -> None:
-    """Идемпотентно: ML-модели, демо-пользователь и админ, балансы, журнал, пример задачи/истории/фидбека."""
+    """Идемпотентно: ML-модели, демо-пользователь и админ, балансы, журнал."""
     _seed_ml_models(session)
     _seed_demo_users(session)
     _seed_demo_admin_debit(session)
-    _seed_demo_user_rich_data(session)
     session.flush()
