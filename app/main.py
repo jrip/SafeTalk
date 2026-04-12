@@ -101,6 +101,12 @@ def _startup_playbook() -> None:
                 spend_amount = Decimal("42")
                 topup_amount = Decimal("500")
 
+                # У стартовых пользователей кошелёк может быть 0 — иначе spend_tokens падает с InsufficientBalanceError
+                for uid, label in ((u1.id, "u1"), (u2.id, "u2")):
+                    if c.billing.get_count_tokens(uid).token_count < spend_amount:
+                        c.billing.add_tokens(uid, topup_amount)
+                        log.info("%s пополнен до демо-списания, баланс: %s", label, c.billing.get_count_tokens(uid).token_count)
+
                 log.info("u1 баланс: %s", c.billing.get_count_tokens(u1.id).token_count)
                 log.info("u1 списываю: %s", spend_amount)
                 log.info("u1 стало: %s", c.billing.spend_tokens(u1.id, spend_amount).token_count)
