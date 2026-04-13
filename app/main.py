@@ -19,6 +19,7 @@ from app.modules.history.routes import router as history_router
 from app.modules.neural.routes import router as predict_router
 from app.modules.system.routes import router as system_router
 from app.modules.telegram.routes import router as telegram_router
+from app.modules.admin.routes import router as admin_router
 from app.modules.users.routes import router as auth_router, users_router
 from app.db.seed import run_seed
 from app.ml_models.constants import ML_MODEL_RUBERT_TOXICITY_ID
@@ -191,3 +192,4 @@ app.include_router(users_router)
 app.include_router(balance_router)
 app.include_router(predict_router)
 app.include_router(history_router)
+app.include_router(admin_router)

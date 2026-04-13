@@ -1,6 +1,8 @@
 import type {
   IBalanceSnapshot,
   ICreatePredictionPayload,
+  IAdminStats,
+  IAdminUserRow,
   IHistoryEntry,
   ILedgerEntry,
   ILoginCredentials,
@@ -32,4 +34,8 @@ export interface ISafeTalkApiClient {
   pollPredictionTask(taskId: string, options?: IPollPredictionOptions): Promise<IPredictionTaskDetail>;
   listMyHistory(): Promise<readonly IHistoryEntry[]>;
   listMyLedger(): Promise<readonly ILedgerEntry[]>;
+  listAdminUsers(): Promise<readonly IAdminUserRow[]>;
+  getAdminStats(): Promise<IAdminStats>;
+  listAdminLedger(limit?: number): Promise<readonly ILedgerEntry[]>;
+  adminTopUpUserBalance(userId: string, amountDecimalString: string): Promise<IBalanceSnapshot>;
 }

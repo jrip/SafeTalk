@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.modules.history.entities import HistoryRecord
@@ -95,3 +95,6 @@ class SqlAlchemyHistoryStore:
             ml_task_id=row.ml_task_id,
             tokens_charged=row.tokens_charged,
         )
+
+    def count_all_records(self) -> int:
+        return int(self._session.scalar(select(func.count()).select_from(HistoryRecordModel)) or 0)

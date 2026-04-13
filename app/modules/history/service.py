@@ -17,6 +17,9 @@ class HistoryService:
     def get_api_history(self, user_id: UUID) -> list[HistoryView]:
         return self._history.list_for_user(user_id)
 
+    def count_all_records(self) -> int:
+        return self._history.count_all_records()
+
     def update_result_for_ml_task(
         self,
         user_id: UUID,

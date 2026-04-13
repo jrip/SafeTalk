@@ -1,5 +1,7 @@
 import type {
   IBalanceSnapshot,
+  IAdminStats,
+  IAdminUserRow,
   ICreatePredictionPayload,
   IHistoryEntry,
   ILedgerEntry,
@@ -14,8 +16,23 @@ import type {
   IVerifyEmailPayload,
 } from "./contracts";
 import type { IRequestContext } from "./http";
-import { requestJson, requestVoid } from "./http";
+import { isUnknownRecord, requestJson, requestVoid } from "./http";
 import type { ISafeTalkApiClient } from "./ISafeTalkApiClient";
+
+function parseAdminUserRow(row: unknown): IAdminUserRow {
+  if (!isUnknownRecord(row)) {
+    throw new Error("Некорректная запись в ответе /admin/users");
+  }
+  return {
+    id: String(row.id ?? ""),
+    name: String(row.name ?? ""),
+    role: String(row.role ?? "user"),
+    allow_negative_balance: Boolean(row.allow_negative_balance),
+    primary_email:
+      row.primary_email === null || row.primary_email === undefined ? null : String(row.primary_email),
+    token_count: String(row.token_count ?? "0"),
+  };
+}
 
 export interface ICreateSafeTalkApiClientDeps {
   readonly getAccessToken: () => string | null;
@@ -134,6 +151,31 @@ export function createSafeTalkApiClient(deps: ICreateSafeTalkApiClientDeps): ISa
 
     async listMyLedger(): Promise<readonly ILedgerEntry[]> {
       return requestJson<ILedgerEntry[]>(ctx, "/balance/me/ledger", { method: "GET", auth: true });
+    },
+
+    async listAdminUsers(): Promise<readonly IAdminUserRow[]> {
+      const raw = await requestJson<unknown>(ctx, "/admin/users", { method: "GET", auth: true });
+      if (!Array.isArray(raw)) {
+        throw new Error("Ответ /admin/users: ожидался массив");
+      }
+      return raw.map(parseAdminUserRow);
+    },
+
+    async getAdminStats(): Promise<IAdminStats> {
+      return requestJson<IAdminStats>(ctx, "/admin/stats", { method: "GET", auth: true });
+    },
+
+    async listAdminLedger(limit?: number): Promise<readonly ILedgerEntry[]> {
+      const q = limit != null ? `?limit=${encodeURIComponent(String(limit))}` : "";
+      return requestJson<ILedgerEntry[]>(ctx, `/admin/ledger${q}`, { method: "GET", auth: true });
+    },
+
+    async adminTopUpUserBalance(userId: string, amountDecimalString: string): Promise<IBalanceSnapshot> {
+      return requestJson<IBalanceSnapshot>(ctx, `/balance/${encodeURIComponent(userId)}/topup`, {
+        method: "POST",
+        body: { amount: amountDecimalString },
+        auth: true,
+      });
     },
   };
 }

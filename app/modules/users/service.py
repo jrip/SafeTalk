@@ -15,6 +15,7 @@ from app.modules.billing.storage_sqlalchemy import SqlAlchemyBalanceStore
 from app.modules.users.entities import User
 from app.modules.users.storage_sqlalchemy import SqlAlchemyUserStore
 from app.modules.users.types import (
+    AdminUserListRow,
     AuthInput,
     AuthTokenView,
     CreateIdentityInput,
@@ -173,6 +174,28 @@ class UserService:
         if user is None:
             raise NotFoundError("User not found")
         return self._to_user_view(user)
+
+    def count_users(self) -> int:
+        return self._users.count_all()
+
+    def list_users_admin(self) -> list[AdminUserListRow]:
+        users = self._users.list_all()
+        rows: list[AdminUserListRow] = []
+        for u in users:
+            identities = self._users.get_identities_by_user(u.id)
+            primary_email = next((i.identifier for i in identities if i.identity_type == "email"), None)
+            token_count, _ = self._balance.load_wallet(u.id)
+            rows.append(
+                AdminUserListRow(
+                    id=u.id,
+                    name=u.name,
+                    role=u.role,
+                    allow_negative_balance=u.allow_negative_balance,
+                    primary_email=primary_email,
+                    token_count=token_count,
+                )
+            )
+        return rows
 
     def update_profile(self, user_id: UUID, payload: UpdateUserInput) -> UserView:
         user = self._users.get_by_id(user_id)

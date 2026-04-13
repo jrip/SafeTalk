@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.core import NotFoundError
@@ -50,6 +50,13 @@ class SqlAlchemyUserStore:
     def get_by_id(self, user_id: UUID) -> User | None:
         row = self._session.get(UserModel, user_id)
         return _user_from_model(row) if row else None
+
+    def list_all(self) -> list[User]:
+        rows = self._session.scalars(select(UserModel).order_by(UserModel.created_at.desc())).all()
+        return [_user_from_model(row) for row in rows]
+
+    def count_all(self) -> int:
+        return int(self._session.scalar(select(func.count()).select_from(UserModel)) or 0)
 
     def add(self, user: User) -> None:
         self._session.add(_user_to_model(user))

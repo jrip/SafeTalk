@@ -20,6 +20,21 @@ export async function readApiErrorBody(res: Response): Promise<string> {
   if (typeof det === "string") {
     return det;
   }
+  if (Array.isArray(det)) {
+    const parts: string[] = [];
+    for (const item of det) {
+      if (!isUnknownRecord(item)) {
+        continue;
+      }
+      const m = item.msg ?? item.message;
+      if (typeof m === "string" && m.length > 0) {
+        parts.push(m);
+      }
+    }
+    if (parts.length > 0) {
+      return parts.join("; ");
+    }
+  }
   return res.statusText;
 }
 

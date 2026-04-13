@@ -24,6 +24,22 @@ export interface IUserProfile {
   readonly identities: readonly string[];
 }
 
+export interface IAdminUserRow {
+  readonly id: string;
+  readonly name: string;
+  readonly role: string;
+  readonly allow_negative_balance: boolean;
+  readonly primary_email: string | null;
+  readonly token_count: string;
+}
+
+export interface IAdminStats {
+  readonly users_count: number;
+  readonly history_records_count: number;
+  readonly ledger_entries_count: number;
+  readonly total_tokens_in_balances: string;
+}
+
 /** Тело `PATCH /users/me` — см. `UpdateMeRequest` в backend. */
 export interface IUpdateMyProfilePayload {
   readonly name: string;
