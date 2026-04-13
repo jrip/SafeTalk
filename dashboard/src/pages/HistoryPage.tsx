@@ -1,5 +1,6 @@
 import { ReloadOutlined } from "@ant-design/icons";
-import { App, Button, Card, Modal, Space, Spin, Table, Tabs, Typography } from "antd";
+import { App, Button, Card, Space, Spin, Table, Tabs, Typography } from "antd";
+import { DraggableModal } from "../components/DraggableModal";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -203,12 +204,26 @@ export default function HistoryPage() {
     {
       title: "Дата и время",
       dataIndex: "created_at",
-      width: 170,
+      width: 180,
       render: (v: string) => dayjs(v).format("YYYY-MM-DD HH:mm:ss"),
     },
     {
-      title: "Тип / запрос",
-      key: "req",
+      title: "ID запроса",
+      key: "req_id",
+      width: 200,
+      ellipsis: true,
+      render: (_, r) => {
+        const id = r.ml_task_id?.trim() || r.id;
+        return (
+          <Typography.Text code copyable ellipsis title={id}>
+            {id}
+          </Typography.Text>
+        );
+      },
+    },
+    {
+      title: "Кусок текста",
+      key: "snippet",
       ellipsis: true,
       render: (_, r) => (
         <Typography.Text ellipsis title={r.request}>
@@ -218,23 +233,25 @@ export default function HistoryPage() {
       ),
     },
     {
-      title: "Результат (фрагмент)",
-      dataIndex: "result",
-      ellipsis: true,
-      render: (v: string) => (v.length > 100 ? `${v.slice(0, 100)}…` : v),
-    },
-    {
-      title: "Списание",
-      dataIndex: "tokens_charged",
-      width: 120,
-      align: "right",
-      render: (v: string | null) => (v == null ? "—" : formatMoney2(v)),
-    },
-    {
       title: "Статус",
       key: "st",
-      width: 110,
+      width: 120,
       render: (_, r) => (r.result === "PENDING" ? "ожидание" : "завершено"),
+    },
+    {
+      title: "Тип операции",
+      key: "op_type",
+      width: 160,
+      ellipsis: true,
+      render: (_, r) =>
+        r.ml_model_id ? modelTitleById(r.ml_model_id) : "Предсказание токсичности",
+    },
+    {
+      title: "Сумма списания",
+      dataIndex: "tokens_charged",
+      width: 130,
+      align: "right",
+      render: (v: string | null) => (v == null ? "—" : formatMoney2(v)),
     },
   ];
 
@@ -314,7 +331,7 @@ export default function HistoryPage() {
         />
       </Card>
 
-      <Modal
+      <DraggableModal
         title="Задача ML"
         open={historyDetail !== null}
         onCancel={() => {
@@ -357,9 +374,9 @@ export default function HistoryPage() {
             )}
           </Space>
         ) : null}
-      </Modal>
+      </DraggableModal>
 
-      <Modal
+      <DraggableModal
         title="Операция по балансу"
         open={ledgerDetail !== null}
         onCancel={() => setLedgerDetail(null)}
@@ -380,7 +397,7 @@ export default function HistoryPage() {
             dataSource={[...ledgerDetailTableRows(ledgerDetail)]}
           />
         ) : null}
-      </Modal>
+      </DraggableModal>
     </Space>
   );
 }
