@@ -5,4 +5,7 @@ app.db
 safetalk_local.db
 **/.env
 LLM_NOTES.local.md
+LLM_NOTES.local.front.md
 safetalk-local.db
+dashboard/node_modules/
+dashboard/dist/

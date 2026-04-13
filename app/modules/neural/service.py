@@ -6,7 +6,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.core import NotFoundError, ValidationError, now_utc
+from app.core import InsufficientBalanceError, NotFoundError, ValidationError, now_utc
 from app.modules.billing.service import BillingService
 from app.modules.history.service import HistoryService
 from app.core.settings import get_settings
@@ -69,6 +69,12 @@ class NeuralService:
         task = MLTask(user_id=payload.user_id, model_id=payload.model_id, text=text)
         char_count = Decimal(len(text))
         charge = char_count * meta.price_per_character
+
+        locked = self._billing.load_balance_state_for_update(payload.user_id)
+        if not locked.allow_negative_balance and locked.token_count < charge:
+            raise InsufficientBalanceError(
+                f"Недостаточно кредитов: требуется {charge}, доступно {locked.token_count}",
+            )
 
         self._ml_tasks.insert_pending(task, charge)
         self._history.save_api_request(

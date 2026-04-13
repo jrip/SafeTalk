@@ -98,6 +98,25 @@ def get_my_ledger(c=Depends(_container), current_user_id: UUID = Depends(require
     return [asdict(x) for x in c.billing.get_ledger_history(current_user_id)]
 
 
+@router.post(
+    "/me/topup",
+    response_model=BalanceResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"model": ErrorResponse},
+        400: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
+def topup_me(
+    payload: TopUpRequest,
+    c=Depends(_container),
+    current_user_id: UUID = Depends(require_user_id),
+) -> dict[str, Any]:
+    """Демо-пополнение без эквайринга (личный кабинет, ТЗ)."""
+    return _as_json(c.billing.add_tokens(current_user_id, payload.amount))
+
+
 @router.get(
     "/{user_id}",
     response_model=BalanceResponse,
