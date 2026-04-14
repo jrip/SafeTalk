@@ -1,4 +1,4 @@
-/** Контракты ответов/запросов backend — только `interface`, явные поля. */
+/** Контракты ответов API — только `interface`, явные поля. */
 
 export interface ILoginCredentials {
   readonly login: string;
@@ -45,7 +45,7 @@ export interface IAdminStats {
   readonly ml_tasks_completed: number;
 }
 
-/** Тело `PATCH /users/me` — см. `UpdateMeRequest` в backend. */
+/** Тело `PATCH /users/me` для обновления профиля. */
 export interface IUpdateMyProfilePayload {
   readonly name: string;
 }
@@ -57,7 +57,7 @@ export interface IAdminPatchUserPayload {
 }
 
 export interface IRegisterResult extends IUserProfile {
-  /** Демо: код верификации из ответа API (см. backend TODO). */
+  /** Код подтверждения email, если сервер возвращает его в ответе (зависит от конфигурации окружения). */
   readonly temporary_only_for_test_todo?: string;
 }
 

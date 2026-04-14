@@ -138,7 +138,7 @@ export default function HistoryPage() {
       render: (v: string) => dayjs(v).format("YYYY-MM-DD HH:mm:ss"),
     },
     {
-      title: "ID запроса",
+      title: "ID задачи",
       key: "req_id",
       width: 200,
       ellipsis: true,
@@ -212,7 +212,7 @@ export default function HistoryPage() {
       <Space align="start" style={{ justifyContent: "space-between", width: "100%" }} wrap>
         <div>
           <Typography.Title level={5} style={{ marginTop: 0, marginBottom: 0, fontWeight: 600, fontSize: 15 }}>
-            История запросов к сервису и движений по балансу.
+            История проверок ML и операций по балансу.
           </Typography.Title>
         </div>
         <Button icon={<ReloadOutlined />} onClick={() => void loadAll()} loading={loading}>

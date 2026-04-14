@@ -63,7 +63,7 @@ export default function DashboardLayout() {
         icon: <ApiOutlined />,
         label: (
           <a href="/docs-public" target="_blank" rel="noopener noreferrer">
-            Публичное API
+            Документация API
           </a>
         ),
       },

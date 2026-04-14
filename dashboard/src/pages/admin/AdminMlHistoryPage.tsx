@@ -91,7 +91,7 @@ export default function AdminMlHistoryPage() {
       ),
     },
     {
-      title: "ID запроса",
+      title: "ID задачи",
       key: "req_id",
       width: 200,
       ellipsis: true,

@@ -70,7 +70,7 @@ export function mlTaskDetailTableRows(
     },
     {
       key: "text",
-      field: "Текст запроса",
+        field: "Текст для проверки",
       value: (
         <Typography.Paragraph style={{ whiteSpace: "pre-wrap", marginBottom: 0, maxHeight: 200, overflow: "auto" }}>
           {d.text}

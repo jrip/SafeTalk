@@ -1,6 +1,5 @@
 /**
- * Backend отдаёт строки вида `тип:идентификатор` (см. `users/routes.py`: `f"{i.identity_type}:{i.identifier}"`).
- * В UI показываем только идентификатор без префикса `email:`, `telegram:` и т.д.
+ * API может отдавать идентичность в виде `тип:значение`. В UI показываем только значение без префикса `email:`, `telegram:` и т.д.
  */
 export function identityWithoutTypePrefix(raw: string): string {
   const idx = raw.indexOf(":");

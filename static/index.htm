@@ -97,6 +97,12 @@
     }
     .nav-links a { color: var(--muted); }
     .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      align-items: center;
+    }
     .btn {
       display: inline-flex;
       align-items: center;
@@ -322,9 +328,11 @@
         <a href="#flow">Как работает</a>
         <a href="#examples">Сценарии</a>
         <a href="#dev">Для разработчиков</a>
-        <a href="/dashboard/login">Кабинет</a>
       </nav>
-      <a class="btn btn-primary" href="/docs-public">Публичный API (Swagger)</a>
+      <div class="nav-cta">
+        <a class="btn btn-primary" href="/dashboard/login">Кабинет</a>
+        <a class="btn btn-primary" href="/docs-public">Публичный API</a>
+      </div>
     </div>
   </header>
 
@@ -463,6 +471,36 @@ Authorization: Bearer …
             <p>Списание привязано к длине текста и тарифу модели. Для крупного клиента — прогнозируемый чек; для малого — нет платы «за простой сервер».</p>
           </div>
         </div>
+
+        <div class="card" style="margin-top:1.5rem">
+          <div class="grid-2" style="align-items:start">
+            <div>
+              <h3>Модели под ваши сценарии</h3>
+              <p>
+                По договорённости возможно <strong>дообучение</strong> (fine-tuning) или иная адаптация моделей под ваш домен:
+                лексика поддержки, отраслевой жаргон, специфика площадки. Отдельно согласовываются данные для обучения,
+                метрики качества, сроки и правовые ограничения — чтобы сигнал ML совпадал с вашими правилами модерации.
+              </p>
+              <div class="pill-row">
+                <span class="pill">fine-tuning</span>
+                <span class="pill">доменные данные</span>
+              </div>
+            </div>
+            <div>
+              <h3>Крупным клиентам — любая интеграция</h3>
+              <p>
+                Для <strong>крупных заказчиков</strong> возможна практически <strong>любая кастомная интеграция</strong>:
+                выделенные воркеры и очереди, нестандартные протоколы и webhooks, вынос в ваш контур (VPC / on-premise
+                при технической возможности), совместная схема с ИБ, комплаенсом и вашими подрядчиками. Обсуждаем
+                архитектуру и SLA под ваш тендер или рамочный контракт.
+              </p>
+              <div class="pill-row">
+                <span class="pill warm">enterprise</span>
+                <span class="pill">кастом под вас</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -520,24 +558,28 @@ Authorization: Bearer …
       <div class="wrap">
         <h2>Для разработчиков и продакта</h2>
         <p class="section-intro">
-          В репозитории есть сценарный скрипт нагрузочного прогона диалогов (<code>scripts/benchmark_dialogs_predict.py</code>): сначала пачка <code>POST</code>, затем опрос —
-          удобно демонстрировать работу двух воркеров и отсутствие потери задач.
+          <strong>Разработчикам:</strong> интеграция на обычном REST — вход по логину и паролю, дальше токен в заголовке;
+          каталог моделей, создание задачи на проверку текста и опрос статуса до завершения. Ответ на создание задачи приходит быстро:
+          вы получаете <code>task_id</code> и не держите HTTP-соединение на время работы ML — обработка идёт в фоне через очередь, что упрощает
+          масштабирование и переживание пиков трафика.
+        </p>
+        <p class="section-intro" style="margin-top: 1rem">
+          <strong>Продакту и владельцу продукта:</strong> в открытой документации API видно, какие поля возвращаются по задаче
+          (статус, списание, итог токсичности и разбор по классам) — это можно сразу закладывать в ТЗ, сценарии модерации и оценку сроков внедрения,
+          без «чёрного ящика» на стороне интеграции.
         </p>
         <div class="hero-cta">
-          <a class="btn btn-primary" href="/docs-public">Открыть публичный Swagger</a>
+          <a class="btn btn-primary" href="/docs-public">Открыть публичную документацию API</a>
           <a class="btn btn-ghost" href="#flow">Схема потока</a>
         </div>
-        <p style="color:var(--muted);font-size:0.9rem;margin-top:1rem">
-          Статическая страница лежит в <code>static/index.htm</code>. Чтобы отдавать её с корня без прокси на FastAPI, добавьте в nginx отдельный <code>location</code> на файлы из <code>static/</code> — иначе откройте файл локально или повесьте раздачу через приложение.
-        </p>
       </div>
     </section>
   </main>
 
   <footer>
     <div class="wrap">
-      <span>© SafeTalk — демонстрационный сервис проверки токсичности текста.</span>
-      <span><a href="/docs-public">/docs-public</a> · <a href="#top">Наверх</a></span>
+      <span>© SafeTalk — сервис проверки текстов на токсичность.</span>
+      <span><a href="#top">Наверх</a></span>
     </div>
   </footer>
 </body>

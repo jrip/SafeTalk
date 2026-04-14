@@ -11,7 +11,7 @@ import { formatLedgerAmountByKind, formatMoney2 } from "../formatCredits";
 import { mlTaskDetailTableRows } from "../ml/mlTaskDetailTableRows";
 
 const { TextArea } = Input;
-/** Синхронно с бэкендом: `app.core.dialog_limits.ML_MAX_DIALOG_CHARS` */
+/** Максимальная длина одного диалога; то же ограничение проверяется на сервере при приёме задачи. */
 const ML_MAX_DIALOG_CHARS = 16_384;
 
 export interface IValidatedLine {
@@ -201,7 +201,7 @@ export default function PredictPage() {
     }
     setBusy(true);
     setLastResult(null);
-    const hide = message.loading("Выполняется запрос…", 0);
+    const hide = message.loading("Выполняется проверка…", 0);
     try {
       const taskId = await api.createPredictionTask({ modelId, text: t });
       const detail = await api.pollPredictionTask(taskId);
@@ -421,7 +421,7 @@ export default function PredictPage() {
             {batchRows.some((r) => r.taskId) ? (
               <>
                 <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
-                  Строку с созданной задачей можно нажать — откроется то же окно с полями, что в разделе «История».
+                  Нажмите строку с задачей — откроется окно с подробными полями (как в разделе «История»).
                 </Typography.Paragraph>
                 <Table
                   size="small"
@@ -445,13 +445,13 @@ export default function PredictPage() {
       ) : (
         <Card title="Отправка одной задачи">
           <Button type="primary" icon={<SendOutlined />} onClick={() => void runSingle()} disabled={busy} loading={busy}>
-            Отправить запрос
+            Отправить на проверку
           </Button>
         </Card>
       )}
 
       {lastResult && !batchMode ? (
-        <Card title="Результат последнего запроса">
+        <Card title="Результат последней проверки">
           <Descriptions bordered size="small" column={1}>
             <Descriptions.Item label="Статус">{lastResult.status}</Descriptions.Item>
             <Descriptions.Item label="Списано кредитов">

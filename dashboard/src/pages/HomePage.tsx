@@ -52,8 +52,8 @@ export default function HomePage() {
             styles={{ body: overviewCardBodyFlex }}
           >
             <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-              Кредиты тратятся на проверки текста через ML. При нуле или отрицательном балансе запросы недоступны — пополните
-              счёт на странице баланса.
+              Кредиты тратятся на проверки текста через ML. При нуле или отрицательном балансе новые проверки недоступны —
+              пополните счёт на странице баланса.
             </Typography.Paragraph>
             <Statistic
               prefix={<WalletOutlined />}
@@ -91,7 +91,7 @@ export default function HomePage() {
             styles={{ body: overviewCardBodyFlex }}
           >
             <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-              Журнал запросов к ML и операций по балансу: что проверяли, сколько списали и когда.
+              Журнал задач ML и операций по балансу: что проверяли, сколько списали и когда.
             </Typography.Paragraph>
             <div style={overviewCardFooter}>
               <Link to="/history">Открыть историю →</Link>
