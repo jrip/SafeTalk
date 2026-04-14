@@ -16,7 +16,7 @@ _BLOCKED_PATHS_EXACT = {
 def _is_public_path(path: str) -> bool:
     if path in _BLOCKED_PATHS_EXACT:
         return False
-    return not (path.startswith("/admin") or path.startswith("/telegram"))
+    return not (path.startswith("/admin") or path.startswith("/telegram") or path.startswith("/health"))
 
 
 def _collect_schema_refs(obj: Any, out: set[str]) -> None:

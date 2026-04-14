@@ -49,10 +49,9 @@ export default function AdminLedgerPage() {
     {
       title: "Пользователь (id)",
       dataIndex: "user_id",
-      width: 200,
-      ellipsis: true,
+      ellipsis: false,
       render: (v: string) => (
-        <Typography.Text code ellipsis title={v}>
+        <Typography.Text code copyable style={{ wordBreak: "break-all", whiteSpace: "normal" }}>
           {v}
         </Typography.Text>
       ),
@@ -78,7 +77,14 @@ export default function AdminLedgerPage() {
       <Typography.Title level={5} style={{ marginTop: 0, marginBottom: 0, fontWeight: 600, fontSize: 15 }}>
         Журнал операций по балансу — все пользователи (последние записи).
       </Typography.Title>
-      <Table rowKey="id" loading={loading} columns={cols} dataSource={[...rows]} pagination={{ pageSize: 20 }} />
+      <Table
+        rowKey="id"
+        loading={loading}
+        columns={cols}
+        dataSource={[...rows]}
+        pagination={{ pageSize: 20 }}
+        style={{ width: "100%" }}
+      />
     </Space>
   );
 }

@@ -13,6 +13,8 @@ from app.bootstrap import build_app_container
 from app.core.api_models import ErrorResponse
 from app.db.database import get_db
 from app.modules.billing.routes import BalanceLedgerEntryResponse, BalanceResponse, TopUpRequest
+from app.modules.history.routes import HistoryResponse
+from app.modules.neural.routes import PredictTaskDetailResponse
 from app.modules.users.auth import require_user_id
 from app.modules.users.types import PatchUserInput
 
@@ -218,3 +220,51 @@ def admin_ledger(
     _require_admin(c, current_user_id)
     cap = min(max(limit, 1), 2000)
     return [BalanceLedgerEntryResponse.model_validate(x) for x in c.billing.get_all_ledger(limit=cap)]
+
+
+@router.get(
+    "/history",
+    response_model=list[HistoryResponse],
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+def admin_history(
+    c=Depends(_container),
+    current_user_id: UUID = Depends(require_user_id),
+    limit: int = 500,
+) -> list[dict[str, Any]]:
+    _require_admin(c, current_user_id)
+    cap = min(max(limit, 1), 2000)
+    return [asdict(x) for x in c.history.get_all_api_history(limit=cap)]
+
+
+@router.get(
+    "/ml-tasks/{task_id}",
+    response_model=PredictTaskDetailResponse,
+    responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
+def admin_get_ml_task(
+    task_id: UUID,
+    c=Depends(_container),
+    current_user_id: UUID = Depends(require_user_id),
+) -> dict[str, Any]:
+    _require_admin(c, current_user_id)
+    detail = c.neural.get_task_for_admin(task_id)
+    return {
+        "task_id": detail.task_id,
+        "user_id": detail.user_id,
+        "model_id": detail.model_id,
+        "text": detail.text,
+        "status": detail.status.value,
+        "charged_tokens": detail.charged_tokens,
+        "created_at": detail.created_at,
+        "completed_at": detail.completed_at,
+        "result_summary": detail.result_summary,
+        "is_toxic": detail.is_toxic,
+        "toxicity_probability": detail.toxicity_probability,
+        "toxicity_breakdown": detail.toxicity_breakdown,
+    }

@@ -62,8 +62,8 @@ export default function LoginPage(): React.ReactElement {
             <Input autoComplete="username" placeholder="you@example.com" size="large" style={{ width: "100%" }} />
           </Form.Item>
           <Form.Item name="password" label="Пароль" rules={[{ required: true, message: "Введите пароль" }]}>
-            <Input.Password
-              className="login-password-rounded"
+            <Input
+              type="password"
               autoComplete="current-password"
               placeholder="Пароль"
               size="large"

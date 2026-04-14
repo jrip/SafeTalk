@@ -1,6 +1,7 @@
 import {
   ApiOutlined,
   BarChartOutlined,
+  FileSearchOutlined,
   HistoryOutlined,
   HomeOutlined,
   LogoutOutlined,
@@ -103,6 +104,11 @@ export default function DashboardLayout() {
             key: "/admin/ledger",
             icon: <TransactionOutlined />,
             label: <Link to="/admin/ledger">Журнал операций</Link>,
+          },
+          {
+            key: "/admin/ml-history",
+            icon: <FileSearchOutlined />,
+            label: <Link to="/admin/ml-history">История задач</Link>,
           },
         ],
       },

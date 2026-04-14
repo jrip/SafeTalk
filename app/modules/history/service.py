@@ -20,6 +20,9 @@ class HistoryService:
     def count_all_records(self) -> int:
         return self._history.count_all_records()
 
+    def get_all_api_history(self, *, limit: int) -> list[HistoryView]:
+        return self._history.list_all(limit=limit)
+
     def update_result_for_ml_task(
         self,
         user_id: UUID,

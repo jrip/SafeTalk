@@ -241,14 +241,7 @@ export default function AdminUsersPage() {
         title="Пользователь"
         open={modalOpen}
         onCancel={closeModal}
-        footer={[
-          <Button key="close" onClick={closeModal}>
-            Закрыть
-          </Button>,
-          <Button key="save" type="primary" loading={savingProfile} onClick={() => void onSaveProfile()}>
-            Сохранить имя и настройки
-          </Button>,
-        ]}
+        footer={null}
         width={560}
         destroyOnClose
       >
@@ -276,9 +269,22 @@ export default function AdminUsersPage() {
                 <Input value={draftName} onChange={(e) => setDraftName(e.target.value)} placeholder="Имя" />
               </div>
 
-              <Checkbox checked={draftAllowNegative} onChange={(e) => setDraftAllowNegative(e.target.checked)}>
-                Разрешить уход баланса в минус
-              </Checkbox>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  flexWrap: "wrap",
+                }}
+              >
+                <Checkbox checked={draftAllowNegative} onChange={(e) => setDraftAllowNegative(e.target.checked)}>
+                  Разрешить уход баланса в минус
+                </Checkbox>
+                <Button type="primary" loading={savingProfile} onClick={() => void onSaveProfile()}>
+                  Сохранить имя и настройки
+                </Button>
+              </div>
 
               <div>
                 <Typography.Text type="secondary" style={{ display: "block", marginBottom: 6 }}>

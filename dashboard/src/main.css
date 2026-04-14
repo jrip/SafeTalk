@@ -55,17 +55,6 @@ body::before {
   border-radius: 14px;
 }
 
-.login-form-rounded .login-password-rounded.ant-input-affix-wrapper {
-  border-radius: 14px !important;
-  width: 100%;
-}
-
-.login-form-rounded .ant-input-affix-wrapper > input.ant-input {
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
 .login-form-rounded input.ant-input:-webkit-autofill,
 .login-form-rounded input.ant-input:-webkit-autofill:hover,
 .login-form-rounded input.ant-input:-webkit-autofill:focus,

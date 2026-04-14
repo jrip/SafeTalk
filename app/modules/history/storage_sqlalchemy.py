@@ -98,3 +98,20 @@ class SqlAlchemyHistoryStore:
 
     def count_all_records(self) -> int:
         return int(self._session.scalar(select(func.count()).select_from(HistoryRecordModel)) or 0)
+
+    def list_all(self, *, limit: int) -> list[HistoryView]:
+        stmt = select(HistoryRecordModel).order_by(HistoryRecordModel.created_at.desc()).limit(limit)
+        rows = self._session.scalars(stmt).all()
+        return [
+            HistoryView(
+                id=r.id,
+                user_id=r.user_id,
+                request=r.request,
+                result=r.result,
+                created_at=r.created_at,
+                ml_model_id=r.ml_model_id,
+                ml_task_id=r.ml_task_id,
+                tokens_charged=r.tokens_charged,
+            )
+            for r in rows
+        ]

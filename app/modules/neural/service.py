@@ -181,6 +181,33 @@ class NeuralService:
             toxicity_breakdown=bd,
         )
 
+    def get_task_for_admin(self, task_id: UUID) -> MlTaskDetailView:
+        """Детали ML-задачи без проверки владельца (только для админских HTTP-ручек)."""
+        row = self._session.get(MlPredictionTaskModel, task_id)
+        if row is None:
+            raise NotFoundError("Task not found")
+        try:
+            st = TaskStatus(row.status)
+        except ValueError:
+            st = TaskStatus.PENDING
+        bd = row.toxicity_breakdown
+        if bd is not None and not isinstance(bd, dict):
+            bd = None
+        return MlTaskDetailView(
+            task_id=row.id,
+            user_id=row.user_id,
+            model_id=row.model_id,
+            text=row.text,
+            status=st,
+            charged_tokens=row.charged_tokens,
+            created_at=row.created_at,
+            completed_at=row.completed_at,
+            result_summary=row.result_summary,
+            is_toxic=row.is_toxic,
+            toxicity_probability=row.toxicity_probability,
+            toxicity_breakdown=bd,
+        )
+
     def get_default_model_id(self) -> UUID:
         meta = self._ml_models.get_default_model_meta()
         if meta is None:

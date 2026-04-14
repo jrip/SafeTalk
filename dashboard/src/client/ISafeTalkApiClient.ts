@@ -39,6 +39,8 @@ export interface ISafeTalkApiClient {
   listAdminUsers(): Promise<readonly IAdminUserRow[]>;
   getAdminStats(): Promise<IAdminStats>;
   listAdminLedger(limit?: number): Promise<readonly ILedgerEntry[]>;
+  listAdminHistory(limit?: number): Promise<readonly IHistoryEntry[]>;
+  getAdminMlTask(taskId: string): Promise<IPredictionTaskDetail>;
   adminTopUpUserBalance(userId: string, amountDecimalString: string): Promise<IBalanceSnapshot>;
   /** Списание токенов с кошелька пользователя (админ, POST `/balance/{id}/spend`). */
   adminSpendUserBalance(userId: string, amountDecimalString: string): Promise<IBalanceSnapshot>;

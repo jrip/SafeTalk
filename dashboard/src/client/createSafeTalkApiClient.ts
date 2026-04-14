@@ -175,6 +175,18 @@ export function createSafeTalkApiClient(deps: ICreateSafeTalkApiClientDeps): ISa
       return requestJson<ILedgerEntry[]>(ctx, `/admin/ledger${q}`, { method: "GET", auth: true });
     },
 
+    async listAdminHistory(limit?: number): Promise<readonly IHistoryEntry[]> {
+      const q = limit != null ? `?limit=${encodeURIComponent(String(limit))}` : "";
+      return requestJson<IHistoryEntry[]>(ctx, `/admin/history${q}`, { method: "GET", auth: true });
+    },
+
+    async getAdminMlTask(taskId: string): Promise<IPredictionTaskDetail> {
+      return requestJson<IPredictionTaskDetail>(ctx, `/admin/ml-tasks/${encodeURIComponent(taskId)}`, {
+        method: "GET",
+        auth: true,
+      });
+    },
+
     async adminTopUpUserBalance(userId: string, amountDecimalString: string): Promise<IBalanceSnapshot> {
       return requestJson<IBalanceSnapshot>(ctx, `/admin/users/${encodeURIComponent(userId)}/topup`, {
         method: "POST",

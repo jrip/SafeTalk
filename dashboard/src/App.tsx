@@ -4,6 +4,7 @@ import { getToken } from "./auth";
 import DashboardLayout from "./layout/DashboardLayout";
 import AccountPage from "./pages/AccountPage";
 import AdminLedgerPage from "./pages/admin/AdminLedgerPage";
+import AdminMlHistoryPage from "./pages/admin/AdminMlHistoryPage";
 import AdminStatsPage from "./pages/admin/AdminStatsPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import BalancePage from "./pages/BalancePage";
@@ -48,6 +49,7 @@ export default function AppRoutes() {
           <Route path="admin/users" element={<AdminUsersPage />} />
           <Route path="admin/stats" element={<AdminStatsPage />} />
           <Route path="admin/ledger" element={<AdminLedgerPage />} />
+          <Route path="admin/ml-history" element={<AdminMlHistoryPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
