@@ -57,6 +57,12 @@ class NeuralService:
         if not text or not text.strip():
             raise ValidationError("Task text cannot be empty")
 
+        max_chars = get_settings().ml_max_dialog_chars
+        if len(text) > max_chars:
+            raise ValidationError(
+                f"Диалог слишком длинный: {len(text)} символов, допустимо не больше {max_chars}.",
+            )
+
         meta = self._ml_models.get_model_meta(payload.model_id)
         if meta is None or not meta.is_active:
             raise NotFoundError("ML model not found or inactive")

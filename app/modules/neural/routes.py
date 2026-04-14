@@ -20,7 +20,10 @@ router = APIRouter(prefix="/predict", tags=["predict"])
 
 class PredictRequest(BaseModel):
     model_id: UUID
-    text: str = Field(min_length=1)
+    text: str = Field(
+        min_length=1,
+        description="Текст одного диалога; на сервере проверяется максимальная длина (по умолчанию 16384 символа, настраивается `ml_max_dialog_chars`).",
+    )
 
 
 class CreatePredictTaskResponse(BaseModel):

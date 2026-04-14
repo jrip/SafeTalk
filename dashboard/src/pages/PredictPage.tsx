@@ -8,7 +8,8 @@ import { useSafeTalkApi } from "../client/ClientContext";
 import { formatMoney2 } from "../formatCredits";
 
 const { TextArea } = Input;
-const MAX_LINE_LEN = 8000;
+/** Синхронно с бэкендом: `app.core.dialog_limits.ML_MAX_DIALOG_CHARS` */
+const ML_MAX_DIALOG_CHARS = 16_384;
 
 export interface IValidatedLine {
   key: string;
@@ -26,31 +27,37 @@ export interface IBatchRow extends IValidatedLine {
   summary?: string;
 }
 
-function validateLines(raw: string): IValidatedLine[] {
-  const parts = raw.split(/\r?\n/);
+/** Три перевода строки подряд (после нормализации `\r\n` → `\n`) — граница между диалогами в пакете. */
+function splitRawIntoDialogBlocks(raw: string): string[] {
+  const norm = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  return norm.split("\n\n\n");
+}
+
+/** Пакет: один элемент = один диалог (многострочный), разделитель — три `\n` подряд. */
+function validateBatchDialogs(raw: string): IValidatedLine[] {
+  const segments = splitRawIntoDialogBlocks(raw);
   const out: IValidatedLine[] = [];
   let lineNo = 0;
-  for (const rawLine of parts) {
+  for (const segment of segments) {
     lineNo += 1;
-    const text = rawLine.replace(/\r$/, "");
-    const trimmed = text.trim();
-    if (!trimmed) {
+    const text = segment.trim();
+    if (!text) {
       out.push({
         key: String(lineNo),
         lineNo,
-        text: rawLine || "(пусто)",
+        text: "(пустой блок)",
         ok: false,
-        reason: "Пустая строка — не отправляется",
+        reason: "Пустой фрагмент между разделителями — пропускается",
       });
       continue;
     }
-    if (text.length > MAX_LINE_LEN) {
+    if (text.length > ML_MAX_DIALOG_CHARS) {
       out.push({
         key: String(lineNo),
         lineNo,
         text: `${text.slice(0, 80)}…`,
         ok: false,
-        reason: `Строка длиннее ${MAX_LINE_LEN} символов`,
+        reason: `Диалог длиннее ${ML_MAX_DIALOG_CHARS} символов`,
       });
       continue;
     }
@@ -111,12 +118,12 @@ export default function PredictPage() {
   }, [api]);
 
   function onParse() {
-    const rows = validateLines(text);
+    const rows = validateBatchDialogs(text);
     setParsed(rows);
     setBatchRows(rows.map((r) => ({ ...r })));
     const rejected = rows.filter((r) => !r.ok).length;
     const accepted = rows.filter((r) => r.ok).length;
-    message.info(`Разбор: принято строк — ${accepted}, отклонено — ${rejected}`);
+    message.info(`Разбор: принято диалогов — ${accepted}, отклонено — ${rejected}`);
   }
 
   async function ensureBalanceForCharge(totalCharge: number): Promise<boolean> {
@@ -142,6 +149,10 @@ export default function PredictPage() {
     const t = text.trim();
     if (!t) {
       message.warning("Введите текст");
+      return;
+    }
+    if (t.length > ML_MAX_DIALOG_CHARS) {
+      message.warning(`Текст длиннее ${ML_MAX_DIALOG_CHARS} символов — сократите диалог.`);
       return;
     }
     const price = Number(selectedModel?.price_per_character ?? 0);
@@ -180,7 +191,7 @@ export default function PredictPage() {
     }
     const okLines = parsed.filter((r) => r.ok);
     if (okLines.length === 0) {
-      message.warning("Нет ни одной допустимой строки после валидации.");
+      message.warning("Нет ни одного допустимого диалога после разбора.");
       return;
     }
     const price = Number(selectedModel?.price_per_character ?? 0);
@@ -225,7 +236,7 @@ export default function PredictPage() {
 
   const parseColumns: ColumnsType<IValidatedLine> = [
     { title: "№", dataIndex: "lineNo", width: 56 },
-    { title: "Фрагмент", dataIndex: "text", ellipsis: true },
+    { title: "Начало диалога", dataIndex: "text", ellipsis: true },
     {
       title: "Валидация",
       key: "v",
@@ -242,7 +253,7 @@ export default function PredictPage() {
 
   const batchColumns: ColumnsType<IBatchRow> = [
     { title: "№", dataIndex: "lineNo", width: 56 },
-    { title: "Фрагмент", dataIndex: "text", ellipsis: true },
+    { title: "Начало диалога", dataIndex: "text", ellipsis: true },
     {
       title: "Валидация",
       key: "v",
@@ -314,14 +325,25 @@ export default function PredictPage() {
             <p className="ant-upload-text">Загрузить .txt в поле ниже</p>
             <p className="ant-upload-hint">Текст из файла появится в поле ниже</p>
           </Upload.Dragger>
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+            Если включён режим <strong>«Пакет: несколько диалогов»</strong>, в поле — несколько диалогов подряд: между
+            соседними блоками ровно <strong>три перевода строки подряд</strong> (в блокноте это три пустые строки между
+            абзацами). Внутри одного диалога обычные переносы строк не разбивают задачу. Пример из репозитория:{" "}
+            <Typography.Text code>fixtures/batch_five_dialogs_example.txt</Typography.Text> (5 блоков: 3 в лимите, 2
+            длиннее допустимого).
+          </Typography.Paragraph>
           <TextArea
             rows={batchMode ? 12 : 8}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Текст для одной задачи или несколько строк в режиме ниже"
+            placeholder={
+              batchMode
+                ? "Диалог 1… затем три пустые строки подряд (граница), затем диалог 2…"
+                : "Один текст для одной задачи ML"
+            }
           />
           <Space align="center" wrap>
-            <Typography.Text>Несколько строк</Typography.Text>
+            <Typography.Text>Пакет: несколько диалогов</Typography.Text>
             <Switch checked={batchMode} onChange={setBatchMode} />
           </Space>
         </Space>
@@ -333,11 +355,15 @@ export default function PredictPage() {
             <Space wrap>
               <Button onClick={onParse}>Разобрать</Button>
               <Button type="primary" icon={<SendOutlined />} onClick={() => void runBatch()} disabled={busy} loading={busy}>
-                Отправить все допустимые строки
+                Отправить все допустимые диалоги
               </Button>
             </Space>
             {parsed.length ? (
-              <Alert type="info" showIcon message="Строки «отклонено» в обработку не отправляются." />
+              <Alert
+                type="info"
+                showIcon
+                message="Диалоги со статусом «отклонено» в обработку не отправляются."
+              />
             ) : null}
             <Table size="small" pagination={false} columns={parseColumns} dataSource={parsed} rowKey="key" />
             {batchRows.some((r) => r.taskId) ? (
