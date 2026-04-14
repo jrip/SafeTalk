@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCredits, formatMoney2, formatSignedMoney2 } from "./formatCredits";
+import { formatCredits, formatLedgerAmountByKind, formatMoney2, formatSignedMoney2 } from "./formatCredits";
 
 describe("formatCredits", () => {
   it("formats positive with thousands and two decimals", () => {
@@ -37,5 +37,16 @@ describe("formatSignedMoney2", () => {
     expect(formatSignedMoney2("127.00000000")).toBe("+127.00");
     expect(formatSignedMoney2("-10.5")).toBe("-10.50");
     expect(formatSignedMoney2("0")).toBe("0.00");
+  });
+});
+
+describe("formatLedgerAmountByKind", () => {
+  it("shows debit as negative and credit as positive", () => {
+    expect(formatLedgerAmountByKind("debit", "127.00000000")).toBe("-127.00");
+    expect(formatLedgerAmountByKind("credit", "10.5")).toBe("+10.50");
+  });
+
+  it("uses absolute value so positive stored amount still debits as minus", () => {
+    expect(formatLedgerAmountByKind("debit", "3")).toBe("-3.00");
   });
 });

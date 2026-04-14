@@ -4,7 +4,7 @@ import dayjs from "dayjs";
 import { useCallback, useEffect, useState } from "react";
 import type { ILedgerEntry } from "../../client/contracts";
 import { useSafeTalkApi } from "../../client/ClientContext";
-import { formatSignedMoney2 } from "../../formatCredits";
+import { formatLedgerAmountByKind } from "../../formatCredits";
 
 function ledgerKindRu(kind: string): string {
   switch (kind) {
@@ -62,7 +62,7 @@ export default function AdminLedgerPage() {
       dataIndex: "amount",
       width: 120,
       align: "right",
-      render: (v: string) => formatSignedMoney2(v),
+      render: (v: string, row: ILedgerEntry) => formatLedgerAmountByKind(row.kind, v),
     },
     {
       title: "task_id",

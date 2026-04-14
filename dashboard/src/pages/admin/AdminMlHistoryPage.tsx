@@ -6,7 +6,8 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { IHistoryEntry, IMlCatalogItem, IPredictionTaskDetail } from "../../client/contracts";
 import { useSafeTalkApi } from "../../client/ClientContext";
 import { DraggableModal } from "../../components/DraggableModal";
-import { formatMoney2 } from "../../formatCredits";
+import { formatLedgerAmountByKind } from "../../formatCredits";
+import { mlTaskDetailTableRows, modelTitleById } from "../../ml/mlTaskDetailTableRows";
 
 export default function AdminMlHistoryPage() {
   const { message } = App.useApp();
@@ -36,86 +37,6 @@ export default function AdminMlHistoryPage() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  function modelTitleById(modelId: string | null | undefined): string {
-    if (!modelId) {
-      return "—";
-    }
-    const m = mlModels.find((x) => x.id === modelId);
-    return m?.name ?? modelId;
-  }
-
-  function taskDetailTableRows(d: IPredictionTaskDetail): readonly { key: string; field: string; value: ReactNode }[] {
-    const breakdown =
-      d.toxicity_breakdown && Object.keys(d.toxicity_breakdown).length > 0
-        ? Object.entries(d.toxicity_breakdown)
-            .map(([k, v]) => `${k}: ${v}`)
-            .join("\n")
-        : null;
-    return [
-      {
-        key: "task_id",
-        field: "ID задачи",
-        value: (
-          <Typography.Text code copyable>
-            {d.task_id}
-          </Typography.Text>
-        ),
-      },
-      {
-        key: "user_id",
-        field: "ID пользователя",
-        value: (
-          <Typography.Text code copyable>
-            {d.user_id}
-          </Typography.Text>
-        ),
-      },
-      { key: "status", field: "Статус", value: d.status },
-      { key: "model", field: "Модель", value: modelTitleById(d.model_id) },
-      { key: "charged", field: "Списано кредитов", value: formatMoney2(d.charged_tokens) },
-      {
-        key: "created",
-        field: "Создано",
-        value: dayjs(d.created_at).format("YYYY-MM-DD HH:mm:ss"),
-      },
-      {
-        key: "completed",
-        field: "Завершено",
-        value: d.completed_at ? dayjs(d.completed_at).format("YYYY-MM-DD HH:mm:ss") : "—",
-      },
-      {
-        key: "text",
-        field: "Текст запроса",
-        value: (
-          <Typography.Paragraph style={{ whiteSpace: "pre-wrap", marginBottom: 0, maxHeight: 200, overflow: "auto" }}>
-            {d.text}
-          </Typography.Paragraph>
-        ),
-      },
-      {
-        key: "toxic",
-        field: "Токсичность",
-        value: d.is_toxic === null ? "—" : d.is_toxic ? "да" : "нет",
-      },
-      {
-        key: "prob",
-        field: "Вероятность токсичности",
-        value: d.toxicity_probability ?? "—",
-      },
-      {
-        key: "breakdown",
-        field: "Разбивка по классам",
-        value: breakdown ? (
-          <Typography.Paragraph style={{ whiteSpace: "pre-wrap", marginBottom: 0, fontFamily: "inherit" }}>
-            {breakdown}
-          </Typography.Paragraph>
-        ) : (
-          "—"
-        ),
-      },
-    ];
-  }
 
   useEffect(() => {
     const taskId = detail?.ml_task_id?.trim();
@@ -206,14 +127,14 @@ export default function AdminMlHistoryPage() {
       width: 160,
       ellipsis: true,
       render: (_, r) =>
-        r.ml_model_id ? modelTitleById(r.ml_model_id) : "Предсказание токсичности",
+        r.ml_model_id ? modelTitleById(r.ml_model_id, mlModels) : "Предсказание токсичности",
     },
     {
       title: "Сумма списания",
       dataIndex: "tokens_charged",
       width: 130,
       align: "right",
-      render: (v: string | null) => (v == null ? "—" : formatMoney2(v)),
+      render: (v: string | null) => (v == null ? "—" : formatLedgerAmountByKind("debit", v)),
     },
   ];
 
@@ -279,7 +200,7 @@ export default function AdminMlHistoryPage() {
                       { title: "Поле", dataIndex: "field", width: 220 },
                       { title: "Значение", dataIndex: "value", render: (v: ReactNode) => v },
                     ]}
-                    dataSource={[...taskDetailTableRows(taskDetail)]}
+                    dataSource={[...mlTaskDetailTableRows(taskDetail, mlModels, { includeUserId: true })]}
                   />
                 ) : null}
               </>

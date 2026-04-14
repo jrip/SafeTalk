@@ -1,11 +1,14 @@
 import { InboxOutlined, SendOutlined } from "@ant-design/icons";
 import type { UploadProps } from "antd";
-import { Alert, App, Button, Card, Descriptions, Form, Input, Select, Space, Switch, Table, Typography, Upload } from "antd";
+import { Alert, App, Button, Card, Descriptions, Form, Input, Select, Space, Spin, Switch, Table, Typography, Upload } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { IMlCatalogItem, IPredictionTaskDetail } from "../client/contracts";
+import { DraggableModal } from "../components/DraggableModal";
 import { useSafeTalkApi } from "../client/ClientContext";
-import { formatMoney2 } from "../formatCredits";
+import { formatLedgerAmountByKind, formatMoney2 } from "../formatCredits";
+import { mlTaskDetailTableRows } from "../ml/mlTaskDetailTableRows";
 
 const { TextArea } = Input;
 /** Синхронно с бэкендом: `app.core.dialog_limits.ML_MAX_DIALOG_CHARS` */
@@ -25,6 +28,8 @@ export interface IBatchRow extends IValidatedLine {
   error?: string;
   charged?: string;
   summary?: string;
+  /** Полный ответ API после опроса задачи (для окна деталей). */
+  taskDetail?: IPredictionTaskDetail;
 }
 
 /** Три перевода строки подряд (после нормализации `\r\n` → `\n`) — граница между диалогами в пакете. */
@@ -78,6 +83,10 @@ export default function PredictPage() {
   const [lastResult, setLastResult] = useState<IPredictionTaskDetail | null>(null);
   const [busy, setBusy] = useState(false);
   const [allowNegative, setAllowNegative] = useState(false);
+  const [batchModalTaskId, setBatchModalTaskId] = useState<string | null>(null);
+  const [batchModalDetail, setBatchModalDetail] = useState<IPredictionTaskDetail | null>(null);
+  const [batchModalLoading, setBatchModalLoading] = useState(false);
+  const [batchModalError, setBatchModalError] = useState<string | null>(null);
 
   const selectedModel = useMemo(() => models.find((m) => m.id === modelId), [models, modelId]);
 
@@ -116,6 +125,36 @@ export default function PredictPage() {
       c = true;
     };
   }, [api]);
+
+  async function openBatchTaskDetail(row: IBatchRow) {
+    if (!row.taskId) {
+      return;
+    }
+    setBatchModalTaskId(row.taskId);
+    setBatchModalError(null);
+    if (row.taskDetail) {
+      setBatchModalDetail(row.taskDetail);
+      setBatchModalLoading(false);
+      return;
+    }
+    setBatchModalDetail(null);
+    setBatchModalLoading(true);
+    try {
+      const d = await api.getPredictionTask(row.taskId);
+      setBatchModalDetail(d);
+    } catch (e) {
+      setBatchModalError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBatchModalLoading(false);
+    }
+  }
+
+  function closeBatchTaskModal() {
+    setBatchModalTaskId(null);
+    setBatchModalDetail(null);
+    setBatchModalError(null);
+    setBatchModalLoading(false);
+  }
 
   function onParse() {
     const rows = validateBatchDialogs(text);
@@ -170,7 +209,7 @@ export default function PredictPage() {
       if (detail.status === "failed") {
         message.error("Задача завершилась с ошибкой");
       } else {
-        message.success(`Готово. Списано кредитов: ${formatMoney2(detail.charged_tokens)}`);
+        message.success(`Готово. Списано кредитов: ${formatLedgerAmountByKind("debit", detail.charged_tokens)}`);
       }
     } catch (e) {
       message.error(e instanceof Error ? e.message : String(e));
@@ -220,6 +259,7 @@ export default function PredictPage() {
           row.status = detail.status;
           row.charged = detail.charged_tokens;
           row.summary = detail.result_summary ?? undefined;
+          row.taskDetail = detail;
           row.error = detail.status === "failed" ? "Ошибка выполнения ML" : undefined;
           setBatchRows([...next]);
         } catch (e) {
@@ -267,7 +307,7 @@ export default function PredictPage() {
       dataIndex: "charged",
       width: 120,
       align: "right",
-      render: (v: string | undefined) => (v == null ? "—" : formatMoney2(v)),
+      render: (v: string | undefined) => (v == null ? "—" : formatLedgerAmountByKind("debit", v)),
     },
     { title: "Ошибка", dataIndex: "error", ellipsis: true },
   ];
@@ -379,7 +419,26 @@ export default function PredictPage() {
             ) : null}
             <Table size="small" pagination={false} columns={parseColumns} dataSource={parsed} rowKey="key" />
             {batchRows.some((r) => r.taskId) ? (
-              <Table size="small" columns={batchColumns} dataSource={batchRows} rowKey="key" pagination={false} />
+              <>
+                <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+                  Строку с созданной задачей можно нажать — откроется то же окно с полями, что в разделе «История».
+                </Typography.Paragraph>
+                <Table
+                  size="small"
+                  columns={batchColumns}
+                  dataSource={batchRows}
+                  rowKey="key"
+                  pagination={false}
+                  onRow={(record) =>
+                    record.taskId
+                      ? {
+                          onClick: () => void openBatchTaskDetail(record),
+                          style: { cursor: "pointer" },
+                        }
+                      : {}
+                  }
+                />
+              </>
             ) : null}
           </Space>
         </Card>
@@ -395,7 +454,9 @@ export default function PredictPage() {
         <Card title="Результат последнего запроса">
           <Descriptions bordered size="small" column={1}>
             <Descriptions.Item label="Статус">{lastResult.status}</Descriptions.Item>
-            <Descriptions.Item label="Списано кредитов">{formatMoney2(lastResult.charged_tokens)}</Descriptions.Item>
+            <Descriptions.Item label="Списано кредитов">
+              {formatLedgerAmountByKind("debit", lastResult.charged_tokens)}
+            </Descriptions.Item>
             <Descriptions.Item label="Токсичность (is_toxic)">
               {lastResult.is_toxic === null ? "—" : lastResult.is_toxic ? "да" : "нет"}
             </Descriptions.Item>
@@ -408,6 +469,33 @@ export default function PredictPage() {
           </Descriptions>
         </Card>
       ) : null}
+
+      <DraggableModal
+        title="Задача ML"
+        open={batchModalTaskId !== null}
+        onCancel={closeBatchTaskModal}
+        footer={null}
+        width={820}
+        destroyOnClose
+      >
+        {batchModalLoading ? (
+          <Spin size="small" />
+        ) : batchModalError ? (
+          <Typography.Text type="danger">{batchModalError}</Typography.Text>
+        ) : batchModalDetail ? (
+          <Table
+            bordered
+            size="small"
+            pagination={false}
+            rowKey="key"
+            columns={[
+              { title: "Поле", dataIndex: "field", width: 220 },
+              { title: "Значение", dataIndex: "value", render: (v: ReactNode) => v },
+            ]}
+            dataSource={[...mlTaskDetailTableRows(batchModalDetail, models)]}
+          />
+        ) : null}
+      </DraggableModal>
     </Space>
   );
 }

@@ -84,3 +84,28 @@ export function formatSignedMoney2(raw: string | null | undefined): string {
   }
   return abs;
 }
+
+/**
+ * Запись журнала: в API `amount` для debit/credit хранится положительным, знак выводим по `kind`.
+ */
+export function formatLedgerAmountByKind(kind: string, raw: string | null | undefined): string {
+  if (raw === null || raw === undefined) {
+    return "—";
+  }
+  const n = parseCreditsNumber(String(raw).trim().replace(/^\+/, ""));
+  if (n === null) {
+    const t = String(raw).trim();
+    return t === "" ? "—" : t;
+  }
+  const abs = Math.abs(n).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  if (kind === "debit") {
+    return `-${abs}`;
+  }
+  if (kind === "credit") {
+    return `+${abs}`;
+  }
+  return abs;
+}
