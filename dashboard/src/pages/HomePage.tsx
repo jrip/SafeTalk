@@ -42,10 +42,6 @@ export default function HomePage() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: "100%" }}>
-      <Typography.Title level={5} style={{ marginTop: 0, marginBottom: 16, fontWeight: 600, fontSize: 15 }}>
-        Главная кабинета: остаток кредитов и переходы к балансу, проверке текста на токсичность и журналу запросов.
-      </Typography.Title>
-
       {err ? <Alert type="error" message={err} showIcon /> : null}
 
       <Row gutter={[16, 16]} align="stretch">

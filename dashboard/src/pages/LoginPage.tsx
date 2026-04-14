@@ -44,7 +44,13 @@ export default function LoginPage(): React.ReactElement {
           <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />
         ) : null}
 
-        <Form<ILoginFormValues> form={form} layout="vertical" onFinish={onFinish} requiredMark="optional">
+        <Form<ILoginFormValues>
+          className="login-form-rounded"
+          form={form}
+          layout="vertical"
+          onFinish={onFinish}
+          requiredMark="optional"
+        >
           <Form.Item
             name="login"
             label="Email"
@@ -53,10 +59,16 @@ export default function LoginPage(): React.ReactElement {
               { type: "email", message: "Некорректный email" },
             ]}
           >
-            <Input autoComplete="username" placeholder="you@example.com" />
+            <Input autoComplete="username" placeholder="you@example.com" size="large" style={{ width: "100%" }} />
           </Form.Item>
           <Form.Item name="password" label="Пароль" rules={[{ required: true, message: "Введите пароль" }]}>
-            <Input.Password autoComplete="current-password" placeholder="Пароль" />
+            <Input.Password
+              className="login-password-rounded"
+              autoComplete="current-password"
+              placeholder="Пароль"
+              size="large"
+              style={{ width: "100%" }}
+            />
           </Form.Item>
           <Form.Item style={{ marginBottom: 8 }}>
             <Button type="primary" htmlType="submit" block loading={busy} icon={<LoginOutlined />}>

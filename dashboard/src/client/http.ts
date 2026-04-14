@@ -1,3 +1,5 @@
+import { clearToken } from "../auth";
+
 export function isUnknownRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
 }
@@ -80,6 +82,16 @@ function parseJsonFromText<T>(text: string): T {
   return JSON.parse(text) as T;
 }
 
+function handleUnauthorizedResponse(res: Response, init: IJsonRequestInit): void {
+  if (!(init.auth ?? false) || res.status !== 401) {
+    return;
+  }
+  clearToken();
+  if (typeof window !== "undefined") {
+    window.location.assign("/dashboard/login");
+  }
+}
+
 export async function requestVoid(ctx: IRequestContext, path: string, init: IJsonRequestInit): Promise<void> {
   const method = init.method ?? "POST";
   const hasBody = init.body !== undefined;
@@ -88,6 +100,7 @@ export async function requestVoid(ctx: IRequestContext, path: string, init: IJso
     headers: headersFor(ctx, hasBody, init.auth ?? false),
     body: hasBody ? JSON.stringify(init.body) : undefined,
   });
+  handleUnauthorizedResponse(res, init);
   if (!res.ok) {
     throw new Error(await readApiErrorBody(res));
   }
@@ -102,6 +115,7 @@ export async function requestJson<T>(ctx: IRequestContext, path: string, init: I
     headers: headersFor(ctx, hasBody, init.auth ?? false),
     body: hasBody ? JSON.stringify(init.body) : undefined,
   });
+  handleUnauthorizedResponse(res, init);
   if (!res.ok) {
     throw new Error(await readApiErrorBody(res));
   }
