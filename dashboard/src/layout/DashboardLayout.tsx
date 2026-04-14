@@ -56,7 +56,7 @@ export default function DashboardLayout() {
       { key: "/", icon: <HomeOutlined />, label: <Link to="/">Обзор</Link> },
       { key: "/account", icon: <UserOutlined />, label: <Link to="/account">Профиль</Link> },
       { key: "/balance", icon: <WalletOutlined />, label: <Link to="/balance">Баланс</Link> },
-      { key: "/predict", icon: <ThunderboltOutlined />, label: <Link to="/predict">Запрос</Link> },
+      { key: "/predict", icon: <ThunderboltOutlined />, label: <Link to="/predict">Задача</Link> },
       { key: "/history", icon: <HistoryOutlined />, label: <Link to="/history">История</Link> },
       {
         key: "docs-public",

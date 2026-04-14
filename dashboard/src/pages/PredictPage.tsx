@@ -291,7 +291,7 @@ export default function PredictPage() {
   return (
     <Space direction="vertical" size="large" style={{ width: "100%" }}>
       <Typography.Title level={5} style={{ marginTop: 0, marginBottom: 16, fontWeight: 600, fontSize: 15 }}>
-        Проверка текста на токсичность: модель, ввод или файл, затем отправка и результат.
+        Проверка текста на токсичность
       </Typography.Title>
 
       <Card title="Параметры">
@@ -322,15 +322,27 @@ export default function PredictPage() {
             <p className="ant-upload-drag-icon">
               <InboxOutlined />
             </p>
-            <p className="ant-upload-text">Загрузить .txt в поле ниже</p>
-            <p className="ant-upload-hint">Текст из файла появится в поле ниже</p>
+            <p className="ant-upload-text">Перетащите сюда файл или выберите его на диске</p>
+            <p className="ant-upload-hint">
+              Принимается только <strong>.txt</strong> в кодировке <strong>UTF-8</strong>. Содержимое файла целиком
+              подставится в поле ниже — можно то же самое набрать вручную, без файла.
+            </p>
           </Upload.Dragger>
           <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Если включён режим <strong>«Пакет: несколько диалогов»</strong>, в поле — несколько диалогов подряд: между
-            соседними блоками ровно <strong>три перевода строки подряд</strong> (в блокноте это три пустые строки между
-            абзацами). Внутри одного диалога обычные переносы строк не разбивают задачу. Пример из репозитория:{" "}
-            <Typography.Text code>fixtures/batch_five_dialogs_example.txt</Typography.Text> (5 блоков: 3 в лимите, 2
-            длиннее допустимого).
+            {batchMode ? (
+              <>
+                <strong>Пакет:</strong> в поле (или в загруженном .txt) идут <strong>несколько диалогов подряд</strong>.
+                Каждый диалог — отдельная проверка. <strong>Разделитель между диалогами</strong> — ровно{" "}
+                <strong>три пустые строки подряд</strong> (после окончания одного текста нажмите Enter, пока не
+                получится три пустые строки, затем начинайте следующий). Обычные переносы строк <em>внутри</em> одного
+                диалога разделителем не являются.
+              </>
+            ) : (
+              <>
+                <strong>Одна проверка:</strong> в поле или в .txt — один сплошной текст; переносы строк внутри него
+                допустимы.
+              </>
+            )}
           </Typography.Paragraph>
           <TextArea
             rows={batchMode ? 12 : 8}
@@ -338,8 +350,8 @@ export default function PredictPage() {
             onChange={(e) => setText(e.target.value)}
             placeholder={
               batchMode
-                ? "Диалог 1… затем три пустые строки подряд (граница), затем диалог 2…"
-                : "Один текст для одной задачи ML"
+                ? "Или вставьте сюда текст из .txt: диалог 1, три пустые строки, диалог 2…"
+                : "Вставьте текст или загрузите .txt (UTF-8) выше"
             }
           />
           <Space align="center" wrap>

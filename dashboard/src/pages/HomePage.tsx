@@ -71,7 +71,7 @@ export default function HomePage() {
         </Col>
         <Col xs={24} sm={12} md={8} style={{ display: "flex" }}>
           <Card
-            title="Запрос"
+            title="Задача"
             style={{ width: "100%", flex: 1, display: "flex", flexDirection: "column" }}
             styles={{ body: overviewCardBodyFlex }}
           >
@@ -80,7 +80,7 @@ export default function HomePage() {
               результата.
             </Typography.Paragraph>
             <div style={overviewCardFooter}>
-              <Link to="/predict">Открыть запрос →</Link>
+              <Link to="/predict">Открыть задачу →</Link>
             </div>
           </Card>
         </Col>
