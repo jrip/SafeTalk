@@ -1,18 +1,20 @@
 from __future__ import annotations
 
+from dataclasses import asdict
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy.orm import Session
 
 from app.bootstrap import build_app_container
 from app.core.api_models import ErrorResponse
 from app.db.database import get_db
-from app.modules.billing.routes import BalanceLedgerEntryResponse
+from app.modules.billing.routes import BalanceLedgerEntryResponse, BalanceResponse, TopUpRequest
 from app.modules.users.auth import require_user_id
+from app.modules.users.types import PatchUserInput
 
 
 def _container(session: Session = Depends(get_db)):
@@ -41,9 +43,14 @@ class AdminUserRowResponse(BaseModel):
 
 class AdminStatsResponse(BaseModel):
     users_count: int
-    history_records_count: int
-    ledger_entries_count: int
-    total_tokens_in_balances: Decimal
+    admins_count: int
+    last_registration_at: str | None
+    total_credits: Decimal
+    total_debits: Decimal
+    positive_balances_sum: Decimal
+    ml_tasks_total: int
+    ml_tasks_pending: int
+    ml_tasks_completed: int
 
 
 @router.get(
@@ -59,6 +66,124 @@ def admin_list_users(
     return [AdminUserRowResponse.model_validate(r) for r in rows]
 
 
+class AdminUserProfileResponse(BaseModel):
+    """Тело ответа GET/PATCH `/admin/users/{user_id}` — как публичный профиль, но только для админа."""
+
+    id: UUID
+    name: str
+    role: str
+    allow_negative_balance: bool
+    identities: list[str]
+
+
+class AdminPatchUserRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1)
+    allow_negative_balance: bool | None = None
+
+    @model_validator(mode="after")
+    def at_least_one_field(self) -> AdminPatchUserRequest:
+        if self.name is None and self.allow_negative_balance is None:
+            raise ValueError("At least one of name, allow_negative_balance must be set")
+        return self
+
+
+class AdminSpendRequest(BaseModel):
+    amount: Decimal = Field(gt=0, json_schema_extra={"example": "10"})
+
+
+def _user_profile_dict(c: Any, user_id: UUID) -> dict[str, Any]:
+    user = c.users.get_profile(user_id)
+    identities = c.users.get_identities(user_id)
+    data = asdict(user)
+    data["identities"] = [f"{i.identity_type}:{i.identifier}" for i in identities]
+    return data
+
+
+@router.get(
+    "/users/{user_id}",
+    response_model=AdminUserProfileResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+)
+def admin_get_user(
+    user_id: UUID,
+    c=Depends(_container),
+    current_user_id: UUID = Depends(require_user_id),
+) -> dict[str, Any]:
+    _require_admin(c, current_user_id)
+    return _user_profile_dict(c, user_id)
+
+
+@router.patch(
+    "/users/{user_id}",
+    response_model=AdminUserProfileResponse,
+    responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        400: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
+def admin_patch_user(
+    user_id: UUID,
+    payload: AdminPatchUserRequest,
+    c=Depends(_container),
+    current_user_id: UUID = Depends(require_user_id),
+) -> dict[str, Any]:
+    _require_admin(c, current_user_id)
+    updated = c.users.admin_patch_user(
+        user_id,
+        PatchUserInput(name=payload.name, allow_negative_balance=payload.allow_negative_balance),
+    )
+    data = asdict(updated)
+    data["identities"] = [f"{i.identity_type}:{i.identifier}" for i in c.users.get_identities(user_id)]
+    return data
+
+
+@router.post(
+    "/users/{user_id}/topup",
+    response_model=BalanceResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        400: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
+def admin_topup_user(
+    user_id: UUID,
+    payload: TopUpRequest,
+    c=Depends(_container),
+    current_user_id: UUID = Depends(require_user_id),
+) -> dict[str, Any]:
+    _require_admin(c, current_user_id)
+    return asdict(c.billing.add_tokens(user_id, payload.amount))
+
+
+@router.post(
+    "/users/{user_id}/spend",
+    response_model=BalanceResponse,
+    responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        400: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
+def admin_spend_user(
+    user_id: UUID,
+    payload: AdminSpendRequest,
+    c=Depends(_container),
+    current_user_id: UUID = Depends(require_user_id),
+) -> dict[str, Any]:
+    _require_admin(c, current_user_id)
+    return asdict(c.billing.spend_tokens(user_id, payload.amount))
+
+
 @router.get(
     "/stats",
     response_model=AdminStatsResponse,
@@ -66,11 +191,17 @@ def admin_list_users(
 )
 def admin_stats(c=Depends(_container), current_user_id: UUID = Depends(require_user_id)) -> AdminStatsResponse:
     _require_admin(c, current_user_id)
+    last_reg = c.users.get_latest_registration_at()
     return AdminStatsResponse(
         users_count=c.users.count_users(),
-        history_records_count=c.history.count_all_records(),
-        ledger_entries_count=c.billing.count_ledger_entries(),
-        total_tokens_in_balances=c.billing.sum_all_balances(),
+        admins_count=c.users.count_admins(),
+        last_registration_at=last_reg.isoformat() if last_reg is not None else None,
+        total_credits=c.billing.sum_credits(),
+        total_debits=c.billing.sum_debits(),
+        positive_balances_sum=c.billing.sum_positive_balances(),
+        ml_tasks_total=c.neural.count_tasks_all(),
+        ml_tasks_pending=c.neural.count_tasks_pending(),
+        ml_tasks_completed=c.neural.count_tasks_completed(),
     )
 
 

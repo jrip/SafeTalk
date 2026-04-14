@@ -45,6 +45,8 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
+      "/docs-public": { target: api, changeOrigin: true },
+      "/openapi-public.json": { target: api, changeOrigin: true },
       "/auth": { target: api, changeOrigin: true },
       "/users": { target: api, changeOrigin: true },
       "/balance": { target: api, changeOrigin: true },

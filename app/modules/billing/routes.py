@@ -28,16 +28,6 @@ class TopUpRequest(BaseModel):
     )
 
 
-class SpendRequest(BaseModel):
-    """Тело POST /balance/{user_id}/spend — сколько токенов списать (только admin)."""
-
-    amount: Decimal = Field(
-        gt=0,
-        description="Сколько токенов списать (Request body, JSON).",
-        json_schema_extra={"example": "10"},
-    )
-
-
 class BalanceResponse(BaseModel):
     user_id: UUID
     token_count: Decimal
@@ -59,12 +49,6 @@ def _container(session: Session = Depends(get_db)):
 
 def _as_json(payload: Any) -> dict[str, Any]:
     return asdict(payload)
-
-
-def _require_admin(c: Any, current_user_id: UUID) -> None:
-    me = c.users.get_profile(current_user_id)
-    if me.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
 
 
 def _can_access_balance(c: Any, current_user_id: UUID, target_user_id: UUID) -> bool:
@@ -131,50 +115,6 @@ def get_balance(user_id: UUID, c=Depends(_container), current_user_id: UUID = De
     if not _can_access_balance(c, current_user_id, user_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return _as_json(c.billing.get_count_tokens(user_id))
-
-
-@router.post(
-    "/{user_id}/topup",
-    response_model=BalanceResponse,
-    status_code=status.HTTP_200_OK,
-    responses={
-        401: {"model": ErrorResponse},
-        403: {"model": ErrorResponse},
-        400: {"model": ErrorResponse},
-        404: {"model": ErrorResponse},
-        422: {"model": ErrorResponse},
-    },
-)
-def topup(
-    user_id: UUID,
-    payload: TopUpRequest,
-    c=Depends(_container),
-    current_user_id: UUID = Depends(require_user_id),
-) -> dict[str, Any]:
-    _require_admin(c, current_user_id)
-    return _as_json(c.billing.add_tokens(user_id, payload.amount))
-
-
-@router.post(
-    "/{user_id}/spend",
-    response_model=BalanceResponse,
-    responses={
-        401: {"model": ErrorResponse},
-        403: {"model": ErrorResponse},
-        400: {"model": ErrorResponse},
-        404: {"model": ErrorResponse},
-        409: {"model": ErrorResponse},
-        422: {"model": ErrorResponse},
-    },
-)
-def spend(
-    user_id: UUID,
-    payload: SpendRequest,
-    c=Depends(_container),
-    current_user_id: UUID = Depends(require_user_id),
-) -> dict[str, Any]:
-    _require_admin(c, current_user_id)
-    return _as_json(c.billing.spend_tokens(user_id, payload.amount))
 
 
 @router.get(

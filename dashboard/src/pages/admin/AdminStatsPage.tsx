@@ -4,6 +4,17 @@ import type { IAdminStats } from "../../client/contracts";
 import { useSafeTalkApi } from "../../client/ClientContext";
 import { formatMoney2 } from "../../formatCredits";
 
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) {
+    return "—";
+  }
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) {
+    return value;
+  }
+  return d.toLocaleString("ru-RU");
+}
+
 export default function AdminStatsPage() {
   const { message } = App.useApp();
   const api = useSafeTalkApi();
@@ -32,27 +43,52 @@ export default function AdminStatsPage() {
         Сводная статистика (админ).
       </Typography.Title>
       <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={8}>
           <Card loading={loading}>
-            <Statistic title="Пользователей" value={stats?.users_count ?? "—"} />
+            <Statistic title="Пользователей всего" value={stats?.users_count ?? "—"} />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={8}>
           <Card loading={loading}>
-            <Statistic title="Записей в истории ML" value={stats?.history_records_count ?? "—"} />
+            <Statistic title="Из них админов" value={stats?.admins_count ?? "—"} />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={8}>
           <Card loading={loading}>
-            <Statistic title="Строк в журнале баланса" value={stats?.ledger_entries_count ?? "—"} />
+            <Statistic title="Последняя регистрация" value={formatDateTime(stats?.last_registration_at)} />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={8}>
+          <Card loading={loading}>
+            <Statistic title="Всего денег внесено" value={stats ? formatMoney2(stats.total_credits) : "—"} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8}>
+          <Card loading={loading}>
+            <Statistic title="Всего денег потрачено" value={stats ? formatMoney2(stats.total_debits) : "—"} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8}>
           <Card loading={loading}>
             <Statistic
-              title="Сумма кредитов на всех кошельках"
-              value={stats ? formatMoney2(stats.total_tokens_in_balances) : "—"}
+              title="Сумма положительных балансов"
+              value={stats ? formatMoney2(stats.positive_balances_sum) : "—"}
             />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8}>
+          <Card loading={loading}>
+            <Statistic title="Задач ML всего" value={stats?.ml_tasks_total ?? "—"} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8}>
+          <Card loading={loading}>
+            <Statistic title="В работе" value={stats?.ml_tasks_pending ?? "—"} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8}>
+          <Card loading={loading}>
+            <Statistic title="Закончено" value={stats?.ml_tasks_completed ?? "—"} />
           </Card>
         </Col>
       </Row>

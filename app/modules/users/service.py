@@ -20,6 +20,7 @@ from app.modules.users.types import (
     AuthTokenView,
     CreateIdentityInput,
     CreateUserInput,
+    PatchUserInput,
     UpdateUserInput,
     UserIdentityView,
     UserView,
@@ -178,6 +179,12 @@ class UserService:
     def count_users(self) -> int:
         return self._users.count_all()
 
+    def count_admins(self) -> int:
+        return self._users.count_admins()
+
+    def get_latest_registration_at(self) -> datetime | None:
+        return self._users.latest_registered_at()
+
     def list_users_admin(self) -> list[AdminUserListRow]:
         users = self._users.list_all()
         rows: list[AdminUserListRow] = []
@@ -203,6 +210,24 @@ class UserService:
             raise NotFoundError("User not found")
         new_name = self.normalize_name(payload.name)
         updated = replace(user, name=new_name)
+        self._users.save(updated)
+        self._session.commit()
+        return self._to_user_view(updated)
+
+    def admin_patch_user(self, user_id: UUID, payload: PatchUserInput) -> UserView:
+        """Частичное обновление профиля вызывается только из админских HTTP-ручек."""
+        if payload.name is None and payload.allow_negative_balance is None:
+            raise ValidationError("No fields to update")
+        user = self._users.get_by_id(user_id)
+        if user is None:
+            raise NotFoundError("User not found")
+        new_name = user.name if payload.name is None else self.normalize_name(payload.name)
+        new_allow = (
+            user.allow_negative_balance
+            if payload.allow_negative_balance is None
+            else payload.allow_negative_balance
+        )
+        updated = replace(user, name=new_name, allow_negative_balance=new_allow)
         self._users.save(updated)
         self._session.commit()
         return self._to_user_view(updated)

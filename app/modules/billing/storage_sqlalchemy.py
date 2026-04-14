@@ -106,5 +106,23 @@ class SqlAlchemyBalanceStore:
         total = self._session.scalar(select(func.coalesce(func.sum(UserBalanceModel.token_count), 0)))
         return Decimal(str(total)) if total is not None else Decimal("0")
 
+    def sum_positive_balances(self) -> Decimal:
+        total = self._session.scalar(
+            select(func.coalesce(func.sum(UserBalanceModel.token_count), 0)).where(UserBalanceModel.token_count > 0)
+        )
+        return Decimal(str(total)) if total is not None else Decimal("0")
+
+    def sum_credits(self) -> Decimal:
+        total = self._session.scalar(
+            select(func.coalesce(func.sum(BalanceLedgerEntryModel.amount), 0)).where(BalanceLedgerEntryModel.kind == "credit")
+        )
+        return Decimal(str(total)) if total is not None else Decimal("0")
+
+    def sum_debits(self) -> Decimal:
+        total = self._session.scalar(
+            select(func.coalesce(func.sum(BalanceLedgerEntryModel.amount), 0)).where(BalanceLedgerEntryModel.kind == "debit")
+        )
+        return Decimal(str(total)) if total is not None else Decimal("0")
+
     def count_ledger_entries(self) -> int:
         return int(self._session.scalar(select(func.count()).select_from(BalanceLedgerEntryModel)) or 0)

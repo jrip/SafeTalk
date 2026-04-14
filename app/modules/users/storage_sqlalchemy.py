@@ -58,6 +58,14 @@ class SqlAlchemyUserStore:
     def count_all(self) -> int:
         return int(self._session.scalar(select(func.count()).select_from(UserModel)) or 0)
 
+    def count_admins(self) -> int:
+        return int(
+            self._session.scalar(select(func.count()).select_from(UserModel).where(UserModel.role == "admin")) or 0
+        )
+
+    def latest_registered_at(self) -> datetime | None:
+        return self._session.scalar(select(func.max(UserModel.created_at)))
+
     def add(self, user: User) -> None:
         self._session.add(_user_to_model(user))
         self._session.flush()

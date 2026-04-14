@@ -18,6 +18,14 @@ class UpdateUserInput:
 
 
 @dataclass(frozen=True)
+class PatchUserInput:
+    """Частичное обновление пользователя (только админская ручка PATCH /admin/users/{id})."""
+
+    name: str | None = None
+    allow_negative_balance: bool | None = None
+
+
+@dataclass(frozen=True)
 class AuthInput:
     identity_type: str
     identifier: str

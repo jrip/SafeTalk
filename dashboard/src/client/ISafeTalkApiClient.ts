@@ -11,6 +11,7 @@ import type {
   IPredictionTaskDetail,
   IRegisterPayload,
   IRegisterResult,
+  IAdminPatchUserPayload,
   IUpdateMyProfilePayload,
   IUserProfile,
   IVerifyEmailPayload,
@@ -25,6 +26,7 @@ export interface ISafeTalkApiClient {
   register(payload: IRegisterPayload): Promise<IRegisterResult>;
   verifyEmail(payload: IVerifyEmailPayload): Promise<void>;
   getCurrentUser(): Promise<IUserProfile>;
+  getAdminUser(userId: string): Promise<IUserProfile>;
   updateMyProfile(payload: IUpdateMyProfilePayload): Promise<IUserProfile>;
   getMyBalance(): Promise<IBalanceSnapshot>;
   topUpMyBalance(amountDecimalString: string): Promise<IBalanceSnapshot>;
@@ -38,4 +40,7 @@ export interface ISafeTalkApiClient {
   getAdminStats(): Promise<IAdminStats>;
   listAdminLedger(limit?: number): Promise<readonly ILedgerEntry[]>;
   adminTopUpUserBalance(userId: string, amountDecimalString: string): Promise<IBalanceSnapshot>;
+  /** Списание токенов с кошелька пользователя (админ, POST `/balance/{id}/spend`). */
+  adminSpendUserBalance(userId: string, amountDecimalString: string): Promise<IBalanceSnapshot>;
+  adminPatchUser(userId: string, payload: IAdminPatchUserPayload): Promise<IUserProfile>;
 }

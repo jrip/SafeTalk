@@ -190,6 +190,15 @@ class NeuralService:
     def list_catalog_models(self) -> list[MlModelCatalogItemView]:
         return self._ml_models.list_active_catalog_items()
 
+    def count_tasks_all(self) -> int:
+        return self._ml_tasks.count_all()
+
+    def count_tasks_pending(self) -> int:
+        return self._ml_tasks.count_by_status(TaskStatus.PENDING)
+
+    def count_tasks_completed(self) -> int:
+        return self._ml_tasks.count_by_status(TaskStatus.COMPLETED)
+
     def get_toxicity(self, payload: RunPredictionInput) -> PredictionView:
         raise NotImplementedError("Neural processing is mocked at this stage")
 

@@ -43,6 +43,15 @@ class BillingService:
     def sum_all_balances(self) -> Decimal:
         return self._balance.sum_all_token_balances()
 
+    def sum_positive_balances(self) -> Decimal:
+        return self._balance.sum_positive_balances()
+
+    def sum_credits(self) -> Decimal:
+        return self._balance.sum_credits()
+
+    def sum_debits(self) -> Decimal:
+        return self._balance.sum_debits()
+
     def count_ledger_entries(self) -> int:
         return self._balance.count_ledger_entries()
 

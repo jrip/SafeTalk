@@ -9,6 +9,7 @@ import type {
   IMlCatalogItem,
   IPollPredictionOptions,
   IPredictionTaskDetail,
+  IAdminPatchUserPayload,
   IRegisterPayload,
   IRegisterResult,
   IUpdateMyProfilePayload,
@@ -80,6 +81,10 @@ export function createSafeTalkApiClient(deps: ICreateSafeTalkApiClientDeps): ISa
 
     async getCurrentUser(): Promise<IUserProfile> {
       return requestJson<IUserProfile>(ctx, "/users/me", { method: "GET", auth: true });
+    },
+
+    async getAdminUser(userId: string): Promise<IUserProfile> {
+      return requestJson<IUserProfile>(ctx, `/admin/users/${encodeURIComponent(userId)}`, { method: "GET", auth: true });
     },
 
     async updateMyProfile(payload: IUpdateMyProfilePayload): Promise<IUserProfile> {
@@ -171,9 +176,32 @@ export function createSafeTalkApiClient(deps: ICreateSafeTalkApiClientDeps): ISa
     },
 
     async adminTopUpUserBalance(userId: string, amountDecimalString: string): Promise<IBalanceSnapshot> {
-      return requestJson<IBalanceSnapshot>(ctx, `/balance/${encodeURIComponent(userId)}/topup`, {
+      return requestJson<IBalanceSnapshot>(ctx, `/admin/users/${encodeURIComponent(userId)}/topup`, {
         method: "POST",
         body: { amount: amountDecimalString },
+        auth: true,
+      });
+    },
+
+    async adminSpendUserBalance(userId: string, amountDecimalString: string): Promise<IBalanceSnapshot> {
+      return requestJson<IBalanceSnapshot>(ctx, `/admin/users/${encodeURIComponent(userId)}/spend`, {
+        method: "POST",
+        body: { amount: amountDecimalString },
+        auth: true,
+      });
+    },
+
+    async adminPatchUser(userId: string, payload: IAdminPatchUserPayload): Promise<IUserProfile> {
+      const body: Record<string, string | boolean> = {};
+      if (payload.name !== undefined) {
+        body.name = payload.name;
+      }
+      if (payload.allow_negative_balance !== undefined) {
+        body.allow_negative_balance = payload.allow_negative_balance;
+      }
+      return requestJson<IUserProfile>(ctx, `/admin/users/${encodeURIComponent(userId)}`, {
+        method: "PATCH",
+        body,
         auth: true,
       });
     },

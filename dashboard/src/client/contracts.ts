@@ -35,14 +35,25 @@ export interface IAdminUserRow {
 
 export interface IAdminStats {
   readonly users_count: number;
-  readonly history_records_count: number;
-  readonly ledger_entries_count: number;
-  readonly total_tokens_in_balances: string;
+  readonly admins_count: number;
+  readonly last_registration_at: string | null;
+  readonly total_credits: string;
+  readonly total_debits: string;
+  readonly positive_balances_sum: string;
+  readonly ml_tasks_total: number;
+  readonly ml_tasks_pending: number;
+  readonly ml_tasks_completed: number;
 }
 
 /** Тело `PATCH /users/me` — см. `UpdateMeRequest` в backend. */
 export interface IUpdateMyProfilePayload {
   readonly name: string;
+}
+
+/** PATCH `/admin/users/{id}`. */
+export interface IAdminPatchUserPayload {
+  readonly name?: string;
+  readonly allow_negative_balance?: boolean;
 }
 
 export interface IRegisterResult extends IUserProfile {

@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core import now_utc
@@ -91,3 +91,14 @@ class SqlAlchemyMlTaskStore:
         row.completed_at = done_at
         self._session.flush()
         return done_at
+
+    def count_all(self) -> int:
+        return int(self._session.scalar(select(func.count()).select_from(MlPredictionTaskModel)) or 0)
+
+    def count_by_status(self, status: TaskStatus) -> int:
+        return int(
+            self._session.scalar(
+                select(func.count()).select_from(MlPredictionTaskModel).where(MlPredictionTaskModel.status == status.value)
+            )
+            or 0
+        )

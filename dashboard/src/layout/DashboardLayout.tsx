@@ -1,4 +1,5 @@
 import {
+  ApiOutlined,
   BarChartOutlined,
   HistoryOutlined,
   HomeOutlined,
@@ -56,6 +57,15 @@ export default function DashboardLayout() {
       { key: "/balance", icon: <WalletOutlined />, label: <Link to="/balance">Баланс</Link> },
       { key: "/predict", icon: <ThunderboltOutlined />, label: <Link to="/predict">Запрос</Link> },
       { key: "/history", icon: <HistoryOutlined />, label: <Link to="/history">История</Link> },
+      {
+        key: "docs-public",
+        icon: <ApiOutlined />,
+        label: (
+          <a href="/docs-public" target="_blank" rel="noopener noreferrer">
+            Публичное API (Swagger)
+          </a>
+        ),
+      },
     ];
     if (!isAdmin) {
       return base;
