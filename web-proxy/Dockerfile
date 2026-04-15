@@ -16,6 +16,5 @@ RUN apk add --no-cache openssl \
 
 RUN rm -f /etc/nginx/conf.d/default.conf
 
-COPY static/index.htm /usr/share/nginx/html/index.htm
 COPY --from=dashboard /src/dist /usr/share/nginx/html/dashboard
 COPY web-proxy/nginx.conf /etc/nginx/conf.d/app.conf
