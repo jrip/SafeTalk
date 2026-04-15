@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core import now_utc
@@ -82,3 +82,47 @@ class SqlAlchemyBalanceStore:
             )
             for r in rows
         ]
+
+    def list_all_ledger(self, *, limit: int = 500) -> list[BalanceLedgerEntryView]:
+        stmt = (
+            select(BalanceLedgerEntryModel)
+            .order_by(BalanceLedgerEntryModel.created_at.desc(), BalanceLedgerEntryModel.id.desc())
+            .limit(limit)
+        )
+        rows = self._session.scalars(stmt).all()
+        return [
+            BalanceLedgerEntryView(
+                id=r.id,
+                user_id=r.user_id,
+                kind=r.kind,
+                amount=r.amount,
+                task_id=r.task_id,
+                created_at=r.created_at,
+            )
+            for r in rows
+        ]
+
+    def sum_all_token_balances(self) -> Decimal:
+        total = self._session.scalar(select(func.coalesce(func.sum(UserBalanceModel.token_count), 0)))
+        return Decimal(str(total)) if total is not None else Decimal("0")
+
+    def sum_positive_balances(self) -> Decimal:
+        total = self._session.scalar(
+            select(func.coalesce(func.sum(UserBalanceModel.token_count), 0)).where(UserBalanceModel.token_count > 0)
+        )
+        return Decimal(str(total)) if total is not None else Decimal("0")
+
+    def sum_credits(self) -> Decimal:
+        total = self._session.scalar(
+            select(func.coalesce(func.sum(BalanceLedgerEntryModel.amount), 0)).where(BalanceLedgerEntryModel.kind == "credit")
+        )
+        return Decimal(str(total)) if total is not None else Decimal("0")
+
+    def sum_debits(self) -> Decimal:
+        total = self._session.scalar(
+            select(func.coalesce(func.sum(BalanceLedgerEntryModel.amount), 0)).where(BalanceLedgerEntryModel.kind == "debit")
+        )
+        return Decimal(str(total)) if total is not None else Decimal("0")
+
+    def count_ledger_entries(self) -> int:
+        return int(self._session.scalar(select(func.count()).select_from(BalanceLedgerEntryModel)) or 0)

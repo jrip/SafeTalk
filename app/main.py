@@ -6,11 +6,13 @@ from contextlib import asynccontextmanager
 from decimal import Decimal
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.bootstrap import AppContainer, build_app_container
 from app.core.error_handlers import register_exception_handlers
+from app.core.public_openapi import public_openapi_from_full_schema
 from app.core.settings import validate_settings
 from app.db.config import Base  # подгружает модели в Base.metadata
 from app.db.database import SessionLocal, engine
@@ -19,6 +21,7 @@ from app.modules.history.routes import router as history_router
 from app.modules.neural.routes import router as predict_router
 from app.modules.system.routes import router as system_router
 from app.modules.telegram.routes import router as telegram_router
+from app.modules.admin.routes import router as admin_router
 from app.modules.users.routes import router as auth_router, users_router
 from app.db.seed import run_seed
 from app.ml_models.constants import ML_MODEL_RUBERT_TOXICITY_ID
@@ -191,3 +194,40 @@ app.include_router(users_router)
 app.include_router(balance_router)
 app.include_router(predict_router)
 app.include_router(history_router)
+app.include_router(admin_router)
+
+
+_DOCS_PUBLIC_HTML = """<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>SafeTalk — публичное API</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" crossorigin="anonymous"/>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js" crossorigin="anonymous"></script>
+  <script>
+    window.onload = function () {
+      SwaggerUIBundle({
+        url: "/openapi-public.json",
+        dom_id: "#swagger-ui",
+        persistAuthorization: true,
+      });
+    };
+  </script>
+</body>
+</html>"""
+
+
+@app.get("/openapi-public.json", include_in_schema=False)
+def openapi_public_json() -> JSONResponse:
+    """OpenAPI без путей `/admin/*` (для клиентов и внешней документации)."""
+    return JSONResponse(public_openapi_from_full_schema(app.openapi()))
+
+
+@app.get("/docs-public", include_in_schema=False)
+def docs_public() -> HTMLResponse:
+    """Swagger UI по публичной схеме (`/openapi-public.json`)."""
+    return HTMLResponse(_DOCS_PUBLIC_HTML)

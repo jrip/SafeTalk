@@ -1,0 +1,72 @@
+/* Совместимо с палитрой `static/index.htm` */
+:root {
+  --bg0: #06060a;
+  --bg1: #0e0e16;
+  --surface: #14141f;
+  --surface2: #1a1a2a;
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #f0f0f5;
+  --muted: #9898ac;
+  --accent: #2ee6be;
+  --warm: #ffb547;
+  --radius: 14px;
+  --shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: "Outfit", system-ui, sans-serif;
+  background: var(--bg0);
+  color: var(--text);
+  line-height: 1.55;
+  font-size: 1.05rem;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 100% 80% at 10% -10%, rgba(46, 230, 190, 0.12), transparent 50%),
+    radial-gradient(ellipse 80% 60% at 90% 20%, rgba(255, 181, 71, 0.08), transparent 45%),
+    radial-gradient(ellipse 60% 40% at 50% 100%, rgba(100, 120, 255, 0.06), transparent 40%),
+    linear-gradient(180deg, var(--bg0) 0%, var(--bg1) 45%, var(--bg0) 100%);
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+.login-form-rounded .ant-input,
+.login-form-rounded .ant-input-affix-wrapper {
+  border-radius: 14px;
+}
+
+.login-form-rounded input.ant-input:-webkit-autofill,
+.login-form-rounded input.ant-input:-webkit-autofill:hover,
+.login-form-rounded input.ant-input:-webkit-autofill:focus,
+.login-form-rounded .ant-input-affix-wrapper > input.ant-input:-webkit-autofill,
+.login-form-rounded .ant-input-affix-wrapper > input.ant-input:-webkit-autofill:hover,
+.login-form-rounded .ant-input-affix-wrapper > input.ant-input:-webkit-autofill:focus {
+  border-radius: 14px !important;
+  font-family: inherit !important;
+  font-size: 16px !important;
+  line-height: 1.5 !important;
+  -webkit-text-fill-color: #f0f0f5;
+  caret-color: #f0f0f5;
+  -webkit-box-shadow: 0 0 0 1000px #1a1a2a inset !important;
+  box-shadow: 0 0 0 1000px #1a1a2a inset !important;
+}

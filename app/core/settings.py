@@ -4,6 +4,8 @@ from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.dialog_limits import ML_MAX_DIALOG_CHARS
+
 # Один файл: `app/.env` (тот же путь, что в docker-compose `env_file: app/.env`).
 _APP_DIR = Path(__file__).resolve().parents[1]
 _ENV_FILE = _APP_DIR / ".env"
@@ -43,6 +45,7 @@ class AppSettings(Settings):
     ml_worker_skip_errors_limit: int = 1
     ml_toxicity_backend: str = "mock"
     ml_toxicity_max_length: int = 384
+    ml_max_dialog_chars: int = ML_MAX_DIALOG_CHARS
     TELEGRAM_BOT_TOKEN: Optional[str] = None
     TELEGRAM_WEBHOOK_SECRET_TOKEN: Optional[str] = None
     email_verification_ttl_seconds: int = 3600

@@ -15,10 +15,12 @@ from app.modules.billing.storage_sqlalchemy import SqlAlchemyBalanceStore
 from app.modules.users.entities import User
 from app.modules.users.storage_sqlalchemy import SqlAlchemyUserStore
 from app.modules.users.types import (
+    AdminUserListRow,
     AuthInput,
     AuthTokenView,
     CreateIdentityInput,
     CreateUserInput,
+    PatchUserInput,
     UpdateUserInput,
     UserIdentityView,
     UserView,
@@ -174,12 +176,58 @@ class UserService:
             raise NotFoundError("User not found")
         return self._to_user_view(user)
 
+    def count_users(self) -> int:
+        return self._users.count_all()
+
+    def count_admins(self) -> int:
+        return self._users.count_admins()
+
+    def get_latest_registration_at(self) -> datetime | None:
+        return self._users.latest_registered_at()
+
+    def list_users_admin(self) -> list[AdminUserListRow]:
+        users = self._users.list_all()
+        rows: list[AdminUserListRow] = []
+        for u in users:
+            identities = self._users.get_identities_by_user(u.id)
+            primary_email = next((i.identifier for i in identities if i.identity_type == "email"), None)
+            token_count, _ = self._balance.load_wallet(u.id)
+            rows.append(
+                AdminUserListRow(
+                    id=u.id,
+                    name=u.name,
+                    role=u.role,
+                    allow_negative_balance=u.allow_negative_balance,
+                    primary_email=primary_email,
+                    token_count=token_count,
+                )
+            )
+        return rows
+
     def update_profile(self, user_id: UUID, payload: UpdateUserInput) -> UserView:
         user = self._users.get_by_id(user_id)
         if user is None:
             raise NotFoundError("User not found")
         new_name = self.normalize_name(payload.name)
         updated = replace(user, name=new_name)
+        self._users.save(updated)
+        self._session.commit()
+        return self._to_user_view(updated)
+
+    def admin_patch_user(self, user_id: UUID, payload: PatchUserInput) -> UserView:
+        """Частичное обновление профиля вызывается только из админских HTTP-ручек."""
+        if payload.name is None and payload.allow_negative_balance is None:
+            raise ValidationError("No fields to update")
+        user = self._users.get_by_id(user_id)
+        if user is None:
+            raise NotFoundError("User not found")
+        new_name = user.name if payload.name is None else self.normalize_name(payload.name)
+        new_allow = (
+            user.allow_negative_balance
+            if payload.allow_negative_balance is None
+            else payload.allow_negative_balance
+        )
+        updated = replace(user, name=new_name, allow_negative_balance=new_allow)
         self._users.save(updated)
         self._session.commit()
         return self._to_user_view(updated)

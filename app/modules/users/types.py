@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 
@@ -14,6 +15,14 @@ class CreateUserInput:
 @dataclass(frozen=True)
 class UpdateUserInput:
     name: str
+
+
+@dataclass(frozen=True)
+class PatchUserInput:
+    """Частичное обновление пользователя (только админская ручка PATCH /admin/users/{id})."""
+
+    name: str | None = None
+    allow_negative_balance: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -46,6 +55,18 @@ class UserIdentityView:
     verification_code_hash: str | None = None
     verification_expires_at: datetime | None = None
     verification_attempts_left: int | None = None
+
+
+@dataclass(frozen=True)
+class AdminUserListRow:
+    """Строка списка пользователей для админки."""
+
+    id: UUID
+    name: str
+    role: str
+    allow_negative_balance: bool
+    primary_email: str | None
+    token_count: Decimal
 
 
 @dataclass(frozen=True)

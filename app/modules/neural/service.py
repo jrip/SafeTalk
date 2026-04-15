@@ -6,7 +6,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.core import NotFoundError, ValidationError, now_utc
+from app.core import InsufficientBalanceError, NotFoundError, ValidationError, now_utc
 from app.modules.billing.service import BillingService
 from app.modules.history.service import HistoryService
 from app.core.settings import get_settings
@@ -57,6 +57,12 @@ class NeuralService:
         if not text or not text.strip():
             raise ValidationError("Task text cannot be empty")
 
+        max_chars = get_settings().ml_max_dialog_chars
+        if len(text) > max_chars:
+            raise ValidationError(
+                f"Диалог слишком длинный: {len(text)} символов, допустимо не больше {max_chars}.",
+            )
+
         meta = self._ml_models.get_model_meta(payload.model_id)
         if meta is None or not meta.is_active:
             raise NotFoundError("ML model not found or inactive")
@@ -69,6 +75,12 @@ class NeuralService:
         task = MLTask(user_id=payload.user_id, model_id=payload.model_id, text=text)
         char_count = Decimal(len(text))
         charge = char_count * meta.price_per_character
+
+        locked = self._billing.load_balance_state_for_update(payload.user_id)
+        if not locked.allow_negative_balance and locked.token_count < charge:
+            raise InsufficientBalanceError(
+                f"Недостаточно кредитов: требуется {charge}, доступно {locked.token_count}",
+            )
 
         self._ml_tasks.insert_pending(task, charge)
         self._history.save_api_request(
@@ -175,6 +187,33 @@ class NeuralService:
             toxicity_breakdown=bd,
         )
 
+    def get_task_for_admin(self, task_id: UUID) -> MlTaskDetailView:
+        """Детали ML-задачи без проверки владельца (только для админских HTTP-ручек)."""
+        row = self._session.get(MlPredictionTaskModel, task_id)
+        if row is None:
+            raise NotFoundError("Task not found")
+        try:
+            st = TaskStatus(row.status)
+        except ValueError:
+            st = TaskStatus.PENDING
+        bd = row.toxicity_breakdown
+        if bd is not None and not isinstance(bd, dict):
+            bd = None
+        return MlTaskDetailView(
+            task_id=row.id,
+            user_id=row.user_id,
+            model_id=row.model_id,
+            text=row.text,
+            status=st,
+            charged_tokens=row.charged_tokens,
+            created_at=row.created_at,
+            completed_at=row.completed_at,
+            result_summary=row.result_summary,
+            is_toxic=row.is_toxic,
+            toxicity_probability=row.toxicity_probability,
+            toxicity_breakdown=bd,
+        )
+
     def get_default_model_id(self) -> UUID:
         meta = self._ml_models.get_default_model_meta()
         if meta is None:
@@ -183,6 +222,15 @@ class NeuralService:
 
     def list_catalog_models(self) -> list[MlModelCatalogItemView]:
         return self._ml_models.list_active_catalog_items()
+
+    def count_tasks_all(self) -> int:
+        return self._ml_tasks.count_all()
+
+    def count_tasks_pending(self) -> int:
+        return self._ml_tasks.count_by_status(TaskStatus.PENDING)
+
+    def count_tasks_completed(self) -> int:
+        return self._ml_tasks.count_by_status(TaskStatus.COMPLETED)
 
     def get_toxicity(self, payload: RunPredictionInput) -> PredictionView:
         raise NotImplementedError("Neural processing is mocked at this stage")

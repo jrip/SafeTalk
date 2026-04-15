@@ -37,6 +37,24 @@ class BillingService:
         self._users.get_profile(user_id)
         return self._balance.list_ledger_for_user(user_id)
 
+    def get_all_ledger(self, *, limit: int = 500) -> list[BalanceLedgerEntryView]:
+        return self._balance.list_all_ledger(limit=limit)
+
+    def sum_all_balances(self) -> Decimal:
+        return self._balance.sum_all_token_balances()
+
+    def sum_positive_balances(self) -> Decimal:
+        return self._balance.sum_positive_balances()
+
+    def sum_credits(self) -> Decimal:
+        return self._balance.sum_credits()
+
+    def sum_debits(self) -> Decimal:
+        return self._balance.sum_debits()
+
+    def count_ledger_entries(self) -> int:
+        return self._balance.count_ledger_entries()
+
     def load_balance_state_for_update(self, user_id: UUID) -> BalanceState:
         profile = self._users.get_profile(user_id)
         token_count, updated_at = self._balance.load_wallet_for_update(user_id)

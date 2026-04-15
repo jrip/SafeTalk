@@ -17,8 +17,8 @@ _ML_MODEL_SPECS: tuple[dict, ...] = (
     {
         "id": ML_MODEL_RUBERT_TOXICITY_ID,
         "slug": "toxic-baseline",
-        "name": "RuBERT-tiny toxicity",
-        "description": "Multilabel токсичность (HF cointegrated/rubert-tiny-toxicity), русский чат.",
+        "name": "Базовая модель токсичности",
+        "description": "Multilabel токсичность",
         "version": "1.0.0",
         "is_active": True,
         "is_default": True,
@@ -27,8 +27,8 @@ _ML_MODEL_SPECS: tuple[dict, ...] = (
     {
         "id": ML_MODEL_TOXIC_LITE_ID,
         "slug": "toxic-lite",
-        "name": "Toxicity lite",
-        "description": "Облегчённая модель (дешевле за запрос); инференс в API пока не подключён.",
+        "name": "Облегченная модель",
+        "description": "Облегчённая модель",
         "version": "1.0.0",
         "is_active": True,
         "is_default": False,
