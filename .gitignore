@@ -4,6 +4,7 @@ __pycache__/
 app.db
 safetalk_local.db
 **/.env
+app/.env
 LLM_NOTES.local.md
 LLM_NOTES.local.front.md
 safetalk-local.db
