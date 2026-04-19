@@ -49,7 +49,14 @@ def test_login_rejects_unverified_user_and_wrong_password(client) -> None:
         json={"login": "auth-errors@example.com", "password": "WrongPass123"},
     )
     assert wrong_password.status_code == 400
-    assert wrong_password.json()["message"] == "Invalid credentials"
+    assert wrong_password.json()["message"] == "Нет такого пользователя или неверный пароль"
+
+    missing_user = client.post(
+        "/auth/login",
+        json={"login": "missing-user@example.com", "password": "WrongPass123"},
+    )
+    assert missing_user.status_code == 400
+    assert missing_user.json()["message"] == "Нет такого пользователя или неверный пароль"
 
 
 def test_protected_routes_require_valid_bearer_token(client) -> None:
