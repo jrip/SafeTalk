@@ -5,8 +5,13 @@ from decimal import Decimal
 import pytest
 
 
-def test_predict_success_updates_balance_and_history(client, auth_headers, register_and_login) -> None:
-    session = register_and_login(email="predict-success@example.com")
+def test_predict_success_updates_balance_and_history(
+    client,
+    auth_headers,
+    auth_session_for_user,
+    verified_user_factory,
+) -> None:
+    session = auth_session_for_user(verified_user_factory(email="predict-success@example.com"))
     headers = auth_headers(session.access_token)
 
     topup_response = client.post("/balance/me/topup", headers=headers, json={"amount": "30.00"})
@@ -58,9 +63,10 @@ def test_predict_success_updates_balance_and_history(client, auth_headers, regis
 def test_predict_rejects_invalid_payload_without_creating_side_effects(
     client,
     auth_headers,
-    register_and_login,
+    auth_session_for_user,
+    verified_user_factory,
 ) -> None:
-    session = register_and_login(email="predict-invalid@example.com")
+    session = auth_session_for_user(verified_user_factory(email="predict-invalid@example.com"))
     headers = auth_headers(session.access_token)
 
     client.post("/balance/me/topup", headers=headers, json={"amount": "10.00"})
@@ -88,9 +94,10 @@ def test_predict_rejects_invalid_payload_without_creating_side_effects(
 def test_predict_rejects_insufficient_balance_without_side_effects(
     client,
     auth_headers,
-    register_and_login,
+    auth_session_for_user,
+    verified_user_factory,
 ) -> None:
-    session = register_and_login(email="predict-insufficient@example.com")
+    session = auth_session_for_user(verified_user_factory(email="predict-insufficient@example.com"))
     headers = auth_headers(session.access_token)
 
     predict_response = client.post(
@@ -117,11 +124,12 @@ def test_predict_internal_failure_keeps_balance_unchanged(
     client_factory,
     app,
     auth_headers,
-    register_and_login,
+    auth_session_for_user,
+    verified_user_factory,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     with client_factory(raise_server_exceptions=False) as client:
-        session = register_and_login(email="predict-error@example.com")
+        session = auth_session_for_user(verified_user_factory(email="predict-error@example.com"))
         headers = auth_headers(session.access_token)
 
         topup_response = client.post("/balance/me/topup", headers=headers, json={"amount": "25.00"})

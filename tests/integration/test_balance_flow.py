@@ -3,8 +3,9 @@ from __future__ import annotations
 from decimal import Decimal
 
 
-def test_balance_topup_and_ledger_flow(client, auth_headers, register_and_login) -> None:
-    session = register_and_login(email="balance@example.com")
+def test_balance_topup_and_ledger_flow(client, auth_headers, auth_session_for_user, verified_user_factory) -> None:
+    user = verified_user_factory(email="balance@example.com")
+    session = auth_session_for_user(user)
     headers = auth_headers(session.access_token)
 
     initial_balance = client.get("/balance/me", headers=headers)

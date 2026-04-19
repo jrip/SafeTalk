@@ -21,6 +21,26 @@ def _create_admin(app_container):
     return admin
 
 
+def _seed_completed_admin_visible_task(app_container, user_id, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "app.modules.neural.service.toxicity_predict",
+        lambda text, model_id: ToxicityPrediction(
+            summary="admin-visible-result",
+            is_toxic=False,
+            toxicity_probability=0.2,
+            breakdown={"toxicity": 0.2},
+        ),
+    )
+    app_container.billing.add_tokens(user_id, Decimal("40.00"))
+    return app_container.neural.create_prediction_task(
+        RunPredictionInput(
+            user_id=user_id,
+            model_id=ML_MODEL_RUBERT_TOXICITY_ID,
+            text="admin route prediction",
+        )
+    )
+
+
 def test_admin_request_model_requires_at_least_one_field() -> None:
     with pytest.raises(PydanticValidationError):
         admin_routes.AdminPatchUserRequest()
@@ -36,32 +56,12 @@ def test_admin_routes_enforce_access_for_non_admin(app_container, registered_use
     assert exc_info.value.detail == "Admin access required"
 
 
-def test_admin_routes_cover_management_flows(
+def test_admin_can_list_and_get_user(
     app_container,
     registered_user_factory,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     admin = _create_admin(app_container)
     user = registered_user_factory(email="managed@example.com")
-
-    monkeypatch.setattr(
-        "app.modules.neural.service.toxicity_predict",
-        lambda text, model_id: ToxicityPrediction(
-            summary="admin-visible-result",
-            is_toxic=False,
-            toxicity_probability=0.2,
-            breakdown={"toxicity": 0.2},
-        ),
-    )
-
-    app_container.billing.add_tokens(user.user.id, Decimal("40.00"))
-    task = app_container.neural.create_prediction_task(
-        RunPredictionInput(
-            user_id=user.user.id,
-            model_id=ML_MODEL_RUBERT_TOXICITY_ID,
-            text="admin route prediction",
-        )
-    )
 
     listed_users = admin_routes.admin_list_users(c=app_container, current_user_id=admin.id)
     assert {row.id for row in listed_users} >= {admin.id, user.user.id}
@@ -69,6 +69,11 @@ def test_admin_routes_cover_management_flows(
     profile = admin_routes.admin_get_user(user.user.id, c=app_container, current_user_id=admin.id)
     assert profile["id"] == user.user.id
     assert profile["identities"] == ["email:managed@example.com"]
+
+
+def test_admin_can_patch_user(app_container, registered_user_factory) -> None:
+    admin = _create_admin(app_container)
+    user = registered_user_factory(email="managed@example.com")
 
     patched = admin_routes.admin_patch_user(
         user.user.id,
@@ -79,13 +84,18 @@ def test_admin_routes_cover_management_flows(
     assert patched["name"] == "Managed Updated"
     assert patched["allow_negative_balance"] is True
 
+
+def test_admin_can_manage_user_balance(app_container, registered_user_factory) -> None:
+    admin = _create_admin(app_container)
+    user = registered_user_factory(email="managed@example.com")
+
     topped_up = admin_routes.admin_topup_user(
         user.user.id,
         admin_routes.TopUpRequest(amount=Decimal("10.00")),
         c=app_container,
         current_user_id=admin.id,
     )
-    assert topped_up["token_count"] == Decimal("28.00")
+    assert topped_up["token_count"] == Decimal("10.00")
 
     spent = admin_routes.admin_spend_user(
         user.user.id,
@@ -93,7 +103,13 @@ def test_admin_routes_cover_management_flows(
         c=app_container,
         current_user_id=admin.id,
     )
-    assert spent["token_count"] == Decimal("23.00")
+    assert spent["token_count"] == Decimal("5.00")
+
+
+def test_admin_can_view_stats_history_and_task(app_container, registered_user_factory, monkeypatch: pytest.MonkeyPatch) -> None:
+    admin = _create_admin(app_container)
+    user = registered_user_factory(email="managed@example.com")
+    task = _seed_completed_admin_visible_task(app_container, user.user.id, monkeypatch)
 
     stats = admin_routes.admin_stats(c=app_container, current_user_id=admin.id)
     assert stats.users_count >= 2
@@ -102,7 +118,7 @@ def test_admin_routes_cover_management_flows(
     assert stats.ml_tasks_completed >= 1
 
     ledger = admin_routes.admin_ledger(c=app_container, current_user_id=admin.id, limit=5000)
-    assert len(ledger) >= 4
+    assert len(ledger) == 2
 
     history = admin_routes.admin_history(c=app_container, current_user_id=admin.id, limit=5000)
     assert len(history) == 1

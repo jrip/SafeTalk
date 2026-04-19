@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
 from types import SimpleNamespace
@@ -14,6 +15,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.bootstrap import AppContainer, build_app_container
 from app.core.error_handlers import register_exception_handlers
 from app.core.public_openapi import public_openapi_from_full_schema
 from app.db.config import Base
@@ -25,11 +27,20 @@ from app.modules.history.routes import router as history_router
 from app.modules.neural.models import MlModelModel
 from app.modules.neural.routes import router as predict_router
 from app.modules.system.routes import router as system_router
-from app.modules.users.auth import _token_to_user
+from app.modules.users.auth import _token_to_user, issue_access_token
 from app.modules.users.routes import router as auth_router, users_router
+from app.modules.users.types import CreateUserInput, UserView
 import app.ml_models.service as ml_models_service
 import app.modules.neural.service as neural_service_module
 import app.modules.users.service as users_service_module
+
+
+@dataclass(frozen=True)
+class PreparedUser:
+    user: UserView
+    email: str | None = None
+    password: str | None = None
+    verification_code: str | None = None
 
 
 @dataclass(frozen=True)
@@ -159,6 +170,19 @@ def session_factory() -> Generator[sessionmaker, None, None]:
 
 
 @pytest.fixture
+def app_container_context(session_factory: sessionmaker) -> Callable[[], Generator[AppContainer, None, None]]:
+    @contextmanager
+    def _context() -> Generator[AppContainer, None, None]:
+        session = session_factory()
+        try:
+            yield build_app_container(session)
+        finally:
+            session.close()
+
+    return _context
+
+
+@pytest.fixture
 def app(session_factory: sessionmaker) -> FastAPI:
     app = _build_test_app()
 
@@ -199,40 +223,105 @@ def auth_headers() -> Callable[[str], dict[str, str]]:
 
 
 @pytest.fixture
-def register_and_login(client: TestClient) -> Callable[..., AuthSession]:
-    def _register_and_login(
+def user_factory(app_container_context: Callable[[], Generator[AppContainer, None, None]]) -> Callable[..., PreparedUser]:
+    def _create(
+        *,
+        name: str = "Integration User",
+        role: str = "user",
+    ) -> PreparedUser:
+        with app_container_context() as c:
+            user = c.users.register(CreateUserInput(name=name, role=role))
+            return PreparedUser(user=user)
+
+    return _create
+
+
+@pytest.fixture
+def unverified_user_factory(
+    app_container_context: Callable[[], Generator[AppContainer, None, None]]
+) -> Callable[..., PreparedUser]:
+    def _create(
         *,
         email: str | None = None,
         password: str = "StrongPass123",
         name: str = "Integration User",
-    ) -> AuthSession:
+        role: str = "user",
+    ) -> PreparedUser:
         login = email or f"user-{uuid4().hex}@example.com"
-        register_response = client.post(
-            "/auth/register",
-            json={"login": login, "password": password, "name": name},
-        )
-        assert register_response.status_code == 201, register_response.text
-        register_payload = register_response.json()
-        verification_code = register_payload["temporary_only_for_test_todo"]
+        with app_container_context() as c:
+            user = c.users.register(CreateUserInput(name=name, role=role))
+            c.users.register_email_identity(user.id, login, password)
+            verification_code = c.users.start_email_verification(login)
+            return PreparedUser(
+                user=user,
+                email=login,
+                password=password,
+                verification_code=verification_code,
+            )
 
-        verify_response = client.post(
-            "/auth/verify-email",
-            json={"login": login, "code": verification_code},
-        )
-        assert verify_response.status_code == 200, verify_response.text
+    return _create
 
+
+@pytest.fixture
+def verified_user_factory(
+    app_container_context: Callable[[], Generator[AppContainer, None, None]]
+) -> Callable[..., PreparedUser]:
+    def _create(
+        *,
+        email: str | None = None,
+        password: str = "StrongPass123",
+        name: str = "Integration User",
+        role: str = "user",
+    ) -> PreparedUser:
+        login = email or f"user-{uuid4().hex}@example.com"
+        with app_container_context() as c:
+            user = c.users.register(CreateUserInput(name=name, role=role))
+            c.users.register_email_identity(user.id, login, password)
+            verification_code = c.users.start_email_verification(login)
+            c.users.verify_email_code(login, verification_code)
+            return PreparedUser(
+                user=user,
+                email=login,
+                password=password,
+                verification_code=verification_code,
+            )
+
+    return _create
+
+
+@pytest.fixture
+def login_via_api(client: TestClient) -> Callable[[PreparedUser, str | None], AuthSession]:
+    def _login(user: PreparedUser, password: str | None = None) -> AuthSession:
+        assert user.email is not None
+        secret = password or user.password
+        assert secret is not None
         login_response = client.post(
             "/auth/login",
-            json={"login": login, "password": password},
+            json={"login": user.email, "password": secret},
         )
         assert login_response.status_code == 200, login_response.text
-
         return AuthSession(
-            user_id=register_payload["id"],
+            user_id=str(user.user.id),
             access_token=login_response.json()["access_token"],
-            email=login,
-            password=password,
-            verification_code=verification_code,
+            email=user.email,
+            password=secret,
+            verification_code=user.verification_code or "",
         )
 
-    return _register_and_login
+    return _login
+
+
+@pytest.fixture
+def auth_session_for_user() -> Callable[[PreparedUser], AuthSession]:
+    def _issue(user: PreparedUser) -> AuthSession:
+        assert user.email is not None
+        assert user.password is not None
+        return AuthSession(
+            user_id=str(user.user.id),
+            access_token=issue_access_token(user.user.id),
+            email=user.email,
+            password=user.password,
+            verification_code=user.verification_code or "",
+        )
+
+    return _issue

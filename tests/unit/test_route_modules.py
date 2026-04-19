@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from fastapi import HTTPException
@@ -14,7 +15,25 @@ from app.modules.neural import routes as neural_routes
 from app.modules.users import routes as users_routes
 
 
-def test_users_routes_cover_register_verify_login_and_profile_flow(app_container) -> None:
+def _register_verified_user_via_routes(
+    app_container,
+    *,
+    email: str = "alice@example.com",
+    password: str = "Secret123",
+    name: str = "Alice",
+) -> dict[str, Any]:
+    registered = users_routes.register(
+        users_routes.RegisterRequest(login=email, password=password, name=name),
+        c=app_container,
+    )
+    users_routes.verify_email(
+        users_routes.VerifyEmailRequest(login=email, code=registered["temporary_only_for_test_todo"]),
+        c=app_container,
+    )
+    return registered
+
+
+def test_register_route_rejects_invalid_email(app_container) -> None:
     invalid_payload = users_routes.RegisterRequest(
         login="invalid-email",
         password="Secret123",
@@ -23,20 +42,22 @@ def test_users_routes_cover_register_verify_login_and_profile_flow(app_container
     with pytest.raises(ValidationError, match="Email format is invalid"):
         users_routes.register(invalid_payload, c=app_container)
 
-    register_payload = users_routes.RegisterRequest(
-        login="alice@example.com",
-        password="Secret123",
-        name="Alice",
+
+def test_users_routes_register_verify_login_flow(app_container) -> None:
+    registered = users_routes.register(
+        users_routes.RegisterRequest(login="alice@example.com", password="Secret123", name="Alice"),
+        c=app_container,
     )
-    registered = users_routes.register(register_payload, c=app_container)
 
     assert registered["name"] == "Alice"
     assert registered["role"] == "user"
     assert registered["identities"] == ["email:alice@example.com"]
-    verification_code = registered["temporary_only_for_test_todo"]
 
     verify_result = users_routes.verify_email(
-        users_routes.VerifyEmailRequest(login="alice@example.com", code=verification_code),
+        users_routes.VerifyEmailRequest(
+            login="alice@example.com",
+            code=registered["temporary_only_for_test_todo"],
+        ),
         c=app_container,
     )
     assert verify_result["status"] == "verified"
@@ -47,25 +68,28 @@ def test_users_routes_cover_register_verify_login_and_profile_flow(app_container
     )
     assert "access_token" in login_result
 
-    current_user_id = registered["id"]
-    me = users_routes.get_me(c=app_container, current_user_id=current_user_id)
-    assert me["id"] == current_user_id
+
+def test_users_routes_get_me_returns_profile(app_container) -> None:
+    registered = _register_verified_user_via_routes(app_container)
+
+    me = users_routes.get_me(c=app_container, current_user_id=registered["id"])
+    assert me["id"] == registered["id"]
     assert me["identities"] == ["email:alice@example.com"]
+
+
+def test_users_routes_update_me_updates_profile(app_container) -> None:
+    registered = _register_verified_user_via_routes(app_container)
 
     updated = users_routes.update_me(
         users_routes.UpdateMeRequest(name="Alice Updated"),
         c=app_container,
-        current_user_id=current_user_id,
+        current_user_id=registered["id"],
     )
     assert updated["name"] == "Alice Updated"
 
 
-def test_billing_and_history_routes_enforce_access_and_return_expected_data(
-    app_container,
-    registered_user_factory,
-) -> None:
+def test_billing_routes_return_balance_and_ledger_for_owner(app_container, registered_user_factory) -> None:
     owner = registered_user_factory(email="owner@example.com")
-    stranger = registered_user_factory(email="stranger@example.com")
 
     initial_balance = billing_routes.get_my_balance(c=app_container, current_user_id=owner.user.id)
     assert initial_balance["token_count"] == Decimal("0")
@@ -83,13 +107,27 @@ def test_billing_and_history_routes_enforce_access_and_return_expected_data(
     assert len(ledger) == 1
     assert ledger[0]["kind"] == "credit"
 
+
+def test_billing_routes_forbid_access_for_other_user(app_container, registered_user_factory) -> None:
+    owner = registered_user_factory(email="owner@example.com")
+    stranger = registered_user_factory(email="stranger@example.com")
+
     with pytest.raises(HTTPException) as exc_info:
         billing_routes.get_balance(owner.user.id, c=app_container, current_user_id=stranger.user.id)
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail == "Access denied"
 
+
+def test_history_routes_return_empty_list_for_owner(app_container, registered_user_factory) -> None:
+    owner = registered_user_factory(email="owner@example.com")
+
     my_history = history_routes.my_history(c=app_container, current_user_id=owner.user.id)
     assert my_history == []
+
+
+def test_history_routes_forbid_access_for_other_user(app_container, registered_user_factory) -> None:
+    owner = registered_user_factory(email="owner@example.com")
+    stranger = registered_user_factory(email="stranger@example.com")
 
     with pytest.raises(HTTPException) as exc_info:
         history_routes.history(owner.user.id, c=app_container, current_user_id=stranger.user.id)
@@ -97,7 +135,18 @@ def test_billing_and_history_routes_enforce_access_and_return_expected_data(
     assert exc_info.value.detail == "Access denied"
 
 
-def test_neural_routes_cover_model_listing_prediction_and_task_lookup(
+def test_neural_routes_list_models(
+    app_container,
+    registered_user_factory,
+) -> None:
+    user = registered_user_factory(email="predict@example.com")
+
+    models = neural_routes.list_ml_models(c=app_container, _current_user_id=user.user.id)
+    assert len(models) >= 1
+    assert models[0]["id"] == ML_MODEL_RUBERT_TOXICITY_ID
+
+
+def test_neural_routes_predict_and_get_task_lookup(
     app_container,
     registered_user_factory,
     monkeypatch: pytest.MonkeyPatch,
@@ -114,10 +163,6 @@ def test_neural_routes_cover_model_listing_prediction_and_task_lookup(
             breakdown={"toxicity": 0.125},
         ),
     )
-
-    models = neural_routes.list_ml_models(c=app_container, _current_user_id=user.user.id)
-    assert len(models) >= 1
-    assert models[0]["id"] == ML_MODEL_RUBERT_TOXICITY_ID
 
     created = neural_routes.predict(
         neural_routes.PredictRequest(model_id=ML_MODEL_RUBERT_TOXICITY_ID, text="route prediction"),

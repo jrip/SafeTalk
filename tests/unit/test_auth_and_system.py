@@ -20,13 +20,15 @@ def test_issue_and_resolve_access_token_roundtrip() -> None:
     assert require_user_id(HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)) == user_id
 
 
-def test_require_user_id_rejects_missing_or_wrong_scheme() -> None:
+def test_require_user_id_rejects_missing_token() -> None:
     with pytest.raises(HTTPException) as exc_info:
         require_user_id(None)
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "Missing or invalid bearer token"
 
+
+def test_require_user_id_rejects_wrong_scheme() -> None:
     with pytest.raises(HTTPException) as exc_info:
         require_user_id(HTTPAuthorizationCredentials(scheme="Basic", credentials="abc"))
 
@@ -42,6 +44,9 @@ def test_require_user_id_rejects_unknown_token() -> None:
     assert exc_info.value.detail == "Invalid access token"
 
 
-def test_system_health_routes_execute_query(session) -> None:
+def test_system_health_route_returns_ok() -> None:
     assert health() == {"status": "ok"}
+
+
+def test_system_db_health_route_returns_connected(session) -> None:
     assert health_db(session) == {"status": "ok", "database": "connected"}
