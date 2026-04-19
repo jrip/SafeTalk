@@ -25,6 +25,54 @@ Swagger UI: `http://127.0.0.1:8000/docs`
 docker compose up -d --build
 ```
 
+## Тесты
+
+Сценарии ручного тестирования и краткий вывод для отчета вынесены в `TESTING_SCENARIOS.md`.
+
+### Установка dev-зависимостей
+
+```bash
+python -m pip install -r app/requirements-dev.txt
+```
+
+### Запуск unit-тестов
+
+```bash
+python -m pytest tests/unit
+```
+
+### Запуск интеграционных тестов
+
+```bash
+python -m pytest tests/integration
+```
+
+### Запуск всех тестов
+
+```bash
+python -m pytest tests
+```
+
+### Запуск unit-тестов с coverage
+
+```bash
+python -m pytest tests --cov=app --cov-report=term
+```
+
+Что покрывается сейчас:
+
+- unit-тесты лежат в `tests/unit`
+- интеграционные тесты лежат в `tests/integration`
+- unit-тестами покрываются сервисный слой, auth, error handlers и route-функции backend-модулей
+- интеграционные тесты проверяют пользовательские backend-сценарии через HTTP (`register -> verify -> login`, баланс, ML-запросы, история)
+- для подробного отчета по покрытию можно добавить `--cov-report=html`
+
+Пример:
+
+```bash
+python -m pytest tests --cov=app --cov-report=term --cov-report=html
+```
+
 ## Конфигурация
 
 Используются переменные окружения:

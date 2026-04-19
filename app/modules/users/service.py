@@ -154,14 +154,14 @@ class UserService:
         identifier = payload.identifier.strip().lower()
         identity = self._users.get_identity(identity_type, identifier)
         if identity is None:
-            raise NotFoundError("User not found")
+            raise ValidationError("Нет такого пользователя или неверный пароль")
         if identity_type == "email":
             if not identity.is_verified:
                 raise ValidationError("Email is not verified")
             if identity.secret_hash is None:
-                raise ValidationError("Invalid credentials")
+                raise ValidationError("Нет такого пользователя или неверный пароль")
             if not verify_password(payload.password_hash, identity.secret_hash):
-                raise ValidationError("Invalid credentials")
+                raise ValidationError("Нет такого пользователя или неверный пароль")
         return AuthTokenView(access_token=str(identity.user_id))
 
     def get_email_identity(self, login: str) -> UserIdentityView | None:
