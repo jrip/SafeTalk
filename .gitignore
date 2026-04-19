@@ -11,3 +11,5 @@ safetalk-local.db
 dashboard/node_modules/
 dashboard/dist/
 dashboard/.vite/
+.coverage
+htmlcov/
