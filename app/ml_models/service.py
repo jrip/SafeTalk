@@ -38,7 +38,7 @@ class MlModelsService:
                 ),
                 is_toxic=False,
                 toxicity_probability=0.0,
-                breakdown={"mode": "stub"},
+                breakdown={"stub": 0.0},
             )
         try:
             from app.ml_models.rubert_tiny_toxicity.inference import rubert_toxicity_prediction

@@ -35,12 +35,12 @@ def hash_password(plain: str) -> str:
 def verify_password(plain: str, stored: str | None) -> bool:
     if not plain or stored is None:
         return False
-    if stored.startswith(("$2a$", "$2b$", "$2y$")):
-        try:
-            return bcrypt.checkpw(plain.encode("utf-8"), stored.encode("utf-8"))
-        except ValueError:
-            return False
-    return plain == stored
+    if not stored.startswith(("$2a$", "$2b$", "$2y$")):
+        return False
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), stored.encode("utf-8"))
+    except ValueError:
+        return False
 
 
 class UserService:

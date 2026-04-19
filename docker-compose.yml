@@ -10,6 +10,8 @@ services:
       ML_TOXICITY_BACKEND: rubert
     volumes:
       - ./app:/workspace/app
+      - ./alembic:/workspace/alembic
+      - ./alembic.ini:/workspace/alembic.ini
     depends_on:
       database:
         condition: service_healthy
