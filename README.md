@@ -41,22 +41,36 @@ python -m pip install -r app/requirements-dev.txt
 python -m pytest tests/unit
 ```
 
+### Запуск интеграционных тестов
+
+```bash
+python -m pytest tests/integration
+```
+
+### Запуск всех тестов
+
+```bash
+python -m pytest tests
+```
+
 ### Запуск unit-тестов с coverage
 
 ```bash
-python -m pytest tests/unit --cov=app --cov-report=term
+python -m pytest tests --cov=app --cov-report=term
 ```
 
 Что покрывается сейчас:
 
 - unit-тесты лежат в `tests/unit`
-- тестируется сервисный слой, auth, error handlers и route-функции backend-модулей
+- интеграционные тесты лежат в `tests/integration`
+- unit-тестами покрываются сервисный слой, auth, error handlers и route-функции backend-модулей
+- интеграционные тесты проверяют пользовательские backend-сценарии через HTTP (`register -> verify -> login`, баланс, ML-запросы, история)
 - для подробного отчета по покрытию можно добавить `--cov-report=html`
 
 Пример:
 
 ```bash
-python -m pytest tests/unit --cov=app --cov-report=term --cov-report=html
+python -m pytest tests --cov=app --cov-report=term --cov-report=html
 ```
 
 ## Конфигурация
