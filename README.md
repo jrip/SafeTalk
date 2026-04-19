@@ -217,6 +217,15 @@ python -m pytest tests --cov=app --cov-report=term --cov-report=html
 - `EMAIL_VERIFICATION_MAX_ATTEMPTS`  
   Сколько попыток дается на ввод кода подтверждения email. Опциональна, есть значение по умолчанию.
 
+- `PASSWORD_RESET_TTL_SECONDS`  
+  Срок жизни одноразовой ссылки сброса пароля. Опциональна, по умолчанию `3600`.
+
+- `PASSWORD_RESET_MAX_PER_EMAIL_PER_HOUR`  
+  Лимит запросов сброса на один email за час. Опциональна, по умолчанию `3`.
+
+- `PASSWORD_RESET_PUBLIC_BASE_URL`  
+  Публичный URL фронта (без завершающего `/`), чтобы собрать ссылку `.../reset-password?token=...` в логах и позже в письме. Опциональна.
+
 Что использовать на практике:
 
 - для `docker compose` обычно достаточно скопировать `app/.env.example` в `app/.env` - нужные обязательные переменные там уже заполнены
@@ -282,6 +291,8 @@ python -m pytest tests --cov=app --cov-report=term --cov-report=html
 | `POST` | `/telegram/webhook` | Webhook Telegram-бота | Telegram Secret Token | Получает update от Telegram и обрабатывает команды внутри сервиса |
 | `POST` | `/auth/verify-email` | Подтверждение email | No | Проверяет код тестового подтверждения |
 | `POST` | `/auth/login` | Логин пользователя | No | Возвращает `access_token`; вход только после verify-email |
+| `POST` | `/auth/forgot-password` | Запрос сброса пароля | No | Одинаковый ответ независимо от наличия email; ссылка в логах до подключения почты |
+| `POST` | `/auth/reset-password` | Установить новый пароль по одноразовому токену из письма | No | После успеха инвалидируются старые bearer-токены |
 | `GET` | `/users/me` | Профиль текущего пользователя | Bearer | Требуется токен из `/auth/login` |
 | `PATCH` | `/users/me` | Обновление профиля текущего пользователя | Bearer | Можно менять имя |
 | `GET` | `/balance/me` | Текущий баланс | Bearer | Баланс текущего пользователя |

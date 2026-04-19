@@ -88,6 +88,9 @@ def stubbed_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda: SimpleNamespace(
             email_verification_ttl_seconds=3600,
             email_verification_max_attempts=3,
+            password_reset_ttl_seconds=3600,
+            password_reset_max_per_email_per_hour=10,
+            password_reset_public_base_url="https://app.example.test",
         ),
     )
     monkeypatch.setattr(

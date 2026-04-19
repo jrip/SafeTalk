@@ -51,6 +51,10 @@ class AppSettings(Settings):
     email_verification_ttl_seconds: int = 3600
     email_verification_max_attempts: int = 10
 
+    password_reset_ttl_seconds: int = 3600
+    password_reset_max_per_email_per_hour: int = 3
+    password_reset_public_base_url: Optional[str] = None
+
     model_config = SettingsConfigDict(
         env_file=_ENV_FILES or None,
         env_file_encoding="utf-8",

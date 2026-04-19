@@ -7,7 +7,12 @@ from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
 from app.modules.system.routes import health, health_db
-from app.modules.users.auth import issue_access_token, require_user_id, resolve_access_token
+from app.modules.users.auth import (
+    issue_access_token,
+    require_user_id,
+    resolve_access_token,
+    revoke_access_tokens_for_user,
+)
 
 
 def test_issue_and_resolve_access_token_roundtrip() -> None:
@@ -42,6 +47,19 @@ def test_require_user_id_rejects_unknown_token() -> None:
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "Invalid access token"
+
+
+def test_revoke_access_tokens_for_user_invalidates_tokens() -> None:
+    user_id = uuid4()
+    t1 = issue_access_token(user_id)
+    t2 = issue_access_token(user_id)
+    assert resolve_access_token(t1) == user_id
+    assert resolve_access_token(t2) == user_id
+
+    revoke_access_tokens_for_user(user_id)
+
+    assert resolve_access_token(t1) is None
+    assert resolve_access_token(t2) is None
 
 
 def test_system_health_route_returns_ok() -> None:

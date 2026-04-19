@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import hashlib
+import logging
 import secrets
 from uuid import UUID
 
@@ -14,6 +15,7 @@ from app.core.settings import get_settings
 from app.modules.billing.storage_sqlalchemy import SqlAlchemyBalanceStore
 from app.modules.users.entities import User
 from app.modules.users.storage_sqlalchemy import SqlAlchemyUserStore
+from app.modules.users.auth import revoke_access_tokens_for_user
 from app.modules.users.types import (
     AdminUserListRow,
     AuthInput,
@@ -25,6 +27,9 @@ from app.modules.users.types import (
     UserIdentityView,
     UserView,
 )
+
+
+log = logging.getLogger(__name__)
 
 
 def hash_password(plain: str) -> str:
@@ -213,6 +218,62 @@ class UserService:
         self._users.save(updated)
         self._session.commit()
         return self._to_user_view(updated)
+
+    def request_password_reset(self, login: str) -> None:
+        """Запрос ссылки сброса: одинаковый исход снаружи; письмо только при валидном verified email+пароле."""
+        settings = get_settings()
+        email_norm = login.strip().lower()
+        if not email_norm or "@" not in email_norm or "." not in email_norm.split("@")[-1]:
+            return
+
+        now = datetime.now(timezone.utc)
+        self._users.record_password_reset_attempt(email_norm)
+        self._session.commit()
+
+        window_start = now - timedelta(hours=1)
+        if self._users.count_password_reset_attempts_by_email(email_norm, window_start) > settings.password_reset_max_per_email_per_hour:
+            return
+
+        identity = self._users.get_identity("email", email_norm)
+        if identity is None or not identity.is_verified or identity.secret_hash is None:
+            return
+
+        self._users.invalidate_unused_password_reset_tokens(identity.user_id)
+        raw = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        expires_at = now + timedelta(seconds=settings.password_reset_ttl_seconds)
+        self._users.insert_password_reset_token(identity.user_id, token_hash, expires_at)
+
+        base = (settings.password_reset_public_base_url or "").strip().rstrip("/")
+        if base:
+            reset_link = f"{base}/reset-password?token={raw}"
+        else:
+            reset_link = f"/reset-password?token={raw}"
+        log.info(
+            "password reset link (configure real email provider in production): login=%s link=%s",
+            email_norm,
+            reset_link,
+        )
+        self._session.commit()
+
+    def complete_password_reset(self, token: str, new_password: str) -> None:
+        if len(new_password) < 8:
+            raise ValidationError("Password must be at least 8 characters")
+        raw = token.strip()
+        if not raw:
+            raise ValidationError("Invalid or expired reset link")
+        token_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        now = datetime.now(timezone.utc)
+        user_id = self._users.try_consume_password_reset_token(token_hash, now)
+        if user_id is None:
+            raise ValidationError("Invalid or expired reset link")
+        try:
+            self._users.set_email_identity_password_hash(user_id, hash_password(new_password))
+            revoke_access_tokens_for_user(user_id)
+            self._session.commit()
+        except Exception:
+            self._session.rollback()
+            raise
 
     def admin_patch_user(self, user_id: UUID, payload: PatchUserInput) -> UserView:
         """Частичное обновление профиля вызывается только из админских HTTP-ручек."""

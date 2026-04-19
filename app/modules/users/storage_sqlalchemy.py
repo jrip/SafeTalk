@@ -1,15 +1,26 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import select, func
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core import NotFoundError
 from app.modules.users.entities import User
-from app.modules.users.models import UserIdentityModel, UserModel
+from app.modules.users.models import (
+    PasswordResetAttemptModel,
+    PasswordResetTokenModel,
+    UserIdentityModel,
+    UserModel,
+)
 from app.modules.users.types import CreateIdentityInput, UserIdentityView
+
+
+def _as_utc_aware(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def _user_from_model(row: UserModel) -> User:
@@ -163,3 +174,64 @@ class SqlAlchemyUserStore:
         next_value = max(0, current - 1)
         row.verification_attempts_left = next_value
         return next_value
+
+    def record_password_reset_attempt(self, email_normalized: str) -> None:
+        self._session.add(
+            PasswordResetAttemptModel(
+                email_normalized=email_normalized,
+            )
+        )
+
+    def count_password_reset_attempts_by_email(self, email_normalized: str, since: datetime) -> int:
+        return int(
+            self._session.scalar(
+                select(func.count())
+                .select_from(PasswordResetAttemptModel)
+                .where(
+                    PasswordResetAttemptModel.email_normalized == email_normalized,
+                    PasswordResetAttemptModel.created_at >= since,
+                )
+            )
+            or 0
+        )
+
+    def invalidate_unused_password_reset_tokens(self, user_id: UUID) -> None:
+        self._session.execute(
+            delete(PasswordResetTokenModel).where(
+                PasswordResetTokenModel.user_id == user_id,
+                PasswordResetTokenModel.used_at.is_(None),
+            )
+        )
+
+    def insert_password_reset_token(self, user_id: UUID, token_hash: str, expires_at: datetime) -> None:
+        self._session.add(
+            PasswordResetTokenModel(
+                user_id=user_id,
+                token_hash=token_hash,
+                expires_at=expires_at,
+            )
+        )
+
+    def try_consume_password_reset_token(self, token_hash: str, now: datetime) -> UUID | None:
+        row = self._session.scalar(
+            select(PasswordResetTokenModel).where(PasswordResetTokenModel.token_hash == token_hash)
+        )
+        if row is None:
+            return None
+        if row.used_at is not None:
+            return None
+        if _as_utc_aware(row.expires_at) < _as_utc_aware(now):
+            return None
+        row.used_at = now
+        return row.user_id
+
+    def set_email_identity_password_hash(self, user_id: UUID, new_hash: str) -> None:
+        row = self._session.scalar(
+            select(UserIdentityModel).where(
+                UserIdentityModel.user_id == user_id,
+                UserIdentityModel.identity_type == "email",
+            )
+        )
+        if row is None:
+            raise NotFoundError("Email identity not found")
+        row.secret_hash = new_hash
