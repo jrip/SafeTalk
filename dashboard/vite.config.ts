@@ -6,7 +6,7 @@ import type { Connect, Plugin } from "vite";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-const api = "http://192.168.1.139";
+const api = process.env.VITE_PROXY_API_ORIGIN ?? "http://127.0.0.1:8000";
 
 const dashboardDir = path.dirname(fileURLToPath(import.meta.url));
 const staticLandingPath = path.resolve(dashboardDir, "..", "static", "index.htm");

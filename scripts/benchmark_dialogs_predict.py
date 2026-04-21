@@ -30,13 +30,13 @@ def _repo_root() -> str:
 
 
 def _seed_demo_credentials() -> tuple[str, str]:
-    """Логин и пароль демо-пользователя — те же, что в app/db/seed.py (_DEMO_USER_LOGIN / _DEMO_SEED_PASSWORD)."""
+    """Логин и пароль демо-пользователя из локального demo-seed."""
     root = _repo_root()
     if root not in sys.path:
         sys.path.insert(0, root)
-    from app.db.seed import _DEMO_SEED_PASSWORD, _DEMO_USER_LOGIN
+    from scripts.seed_demo_data import DEMO_SEED_PASSWORD, DEMO_USER_LOGIN
 
-    return _DEMO_USER_LOGIN, _DEMO_SEED_PASSWORD
+    return DEMO_USER_LOGIN, DEMO_SEED_PASSWORD
 
 
 def _configure_stdio_utf8() -> None:

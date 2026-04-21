@@ -40,6 +40,20 @@ class VerifyEmailRequest(BaseModel):
     code: str = Field(min_length=1, max_length=32)
 
 
+class ForgotPasswordRequest(BaseModel):
+    login: str = Field(min_length=1)
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=1)
+    password: str = Field(min_length=8)
+
+
+class PasswordResetAckResponse(BaseModel):
+    status: str
+    message: str
+
+
 class UpdateMeRequest(BaseModel):
     name: str = Field(min_length=1)
 
@@ -155,6 +169,35 @@ def login(payload: LoginRequest, c=Depends(_container)) -> dict[str, Any]:
     )
     token = issue_access_token(UUID(auth_view.access_token))
     return {"access_token": token}
+
+
+@router.post(
+    "/forgot-password",
+    response_model=PasswordResetAckResponse,
+    responses={422: {"model": ErrorResponse}},
+)
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    c=Depends(_container),
+) -> dict[str, str]:
+    c.users.request_password_reset(payload.login)
+    return {
+        "status": "ok",
+        "message": "If an account with this email exists and can receive a reset, we sent instructions.",
+    }
+
+
+@router.post(
+    "/reset-password",
+    response_model=PasswordResetAckResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+)
+def reset_password(payload: ResetPasswordRequest, c=Depends(_container)) -> dict[str, str]:
+    c.users.complete_password_reset(payload.token, payload.password)
+    return {"status": "ok", "message": "Password has been reset."}
 
 
 @users_router.get(

@@ -81,3 +81,55 @@ def test_protected_route_rejects_invalid_access_token(client) -> None:
     invalid_token = client.get("/history/me", headers={"Authorization": "Bearer deadbeef"})
     assert invalid_token.status_code == 401
     assert invalid_token.json()["message"] == "Invalid access token"
+
+
+def test_password_reset_magic_link_flow(client, verified_user_factory, monkeypatch) -> None:
+    user = verified_user_factory(email="reset-magic@example.com", password="OldPass1234")
+
+    def fixed_token(_n: int) -> str:
+        return "T" * 43
+
+    monkeypatch.setattr("app.modules.users.service.secrets.token_urlsafe", fixed_token)
+
+    forgot = client.post("/auth/forgot-password", json={"login": user.email})
+    assert forgot.status_code == 200
+    assert forgot.json()["status"] == "ok"
+
+    new_password = "NewPass8888"
+    reset = client.post("/auth/reset-password", json={"token": "T" * 43, "password": new_password})
+    assert reset.status_code == 200
+
+    assert client.post("/auth/login", json={"login": user.email, "password": new_password}).status_code == 200
+    bad = client.post("/auth/login", json={"login": user.email, "password": user.password})
+    assert bad.status_code == 400
+
+
+def test_forgot_password_same_response_for_unknown_email(client) -> None:
+    a = client.post("/auth/forgot-password", json={"login": "unknown-reset@example.com"})
+    b = client.post("/auth/forgot-password", json={"login": "other-unknown@example.com"})
+    assert a.status_code == 200 and b.status_code == 200
+    assert a.json() == b.json()
+
+
+def test_reset_password_rejects_invalid_token(client) -> None:
+    r = client.post("/auth/reset-password", json={"token": "invalid", "password": "Password8x"})
+    assert r.status_code == 400
+    assert "reset" in r.json()["message"].lower() or "invalid" in r.json()["message"].lower()
+
+
+def test_reset_password_revokes_existing_sessions(
+    client, verified_user_factory, monkeypatch, auth_headers, login_via_api
+) -> None:
+    user = verified_user_factory(email="reset-revoke@example.com")
+
+    def fixed_token(_n: int) -> str:
+        return "R" * 43
+
+    monkeypatch.setattr("app.modules.users.service.secrets.token_urlsafe", fixed_token)
+
+    session = login_via_api(user)
+    client.post("/auth/forgot-password", json={"login": user.email})
+    client.post("/auth/reset-password", json={"token": "R" * 43, "password": "FreshPass99"})
+
+    me = client.get("/users/me", headers=auth_headers(session.access_token))
+    assert me.status_code == 401

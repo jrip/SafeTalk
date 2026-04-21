@@ -25,6 +25,13 @@ def resolve_access_token(token: str) -> UUID | None:
     return _token_to_user.get(token)
 
 
+def revoke_access_tokens_for_user(user_id: UUID) -> None:
+    """Инвалидирует все bearer-токены, выданные для user_id (например после смены пароля)."""
+    to_remove = [t for t, uid in _token_to_user.items() if uid == user_id]
+    for t in to_remove:
+        del _token_to_user[t]
+
+
 def require_user_id(
     credentials: Annotated[
         HTTPAuthorizationCredentials | None,
