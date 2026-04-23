@@ -15,7 +15,7 @@ from app.core.settings import get_settings
 from app.modules.billing.storage_sqlalchemy import SqlAlchemyBalanceStore
 from app.modules.users.entities import User
 from app.modules.users.storage_sqlalchemy import SqlAlchemyUserStore
-from app.modules.users.auth import revoke_access_tokens_for_user
+from app.modules.users.token_store import revoke_access_tokens_for_user
 from app.modules.users.types import (
     AdminUserListRow,
     AuthInput,
