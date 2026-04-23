@@ -421,7 +421,7 @@ export default function PredictPage() {
             {batchRows.some((r) => r.taskId) ? (
               <>
                 <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
-                  Нажмите строку с задачей — откроется окно с подробными полями (как в разделе «История»).
+                  Нажмите строку с задачей, чтобы открыть подробности.
                 </Typography.Paragraph>
                 <Table
                   size="small"
